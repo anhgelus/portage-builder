@@ -1,5 +1,6 @@
 ; gentoo
-package = 1*(VCHAR) "/" 1*(VCHAR)
+package_part = 1*(ASCII / "-")
+package = package_part "/" package_part 
 
 ; commands
     ; init a handshake
@@ -13,9 +14,9 @@ build_request = "BUILD " package *(" " package) CRLF
 cfg_request = "CONFIG " 1*DIGIT CRLF
     ; init sending a file
     ; 1. absolute path
-    ; 2. sha3-512 checksum of the file
-    ; 3. number of parts
-send_request = "SEND " 1*VCHAR " " 1*VCHAR " " 1*DIGIT CRLF
+    ; 2. number of parts
+    ; 3. raw sha3-512 checksum of the file
+send_request = "SEND " 1*VCHAR " " 1*DIGIT " " 1*VCHAR CRLF
     ; send a part of a file
     ; 1. part number
     ; 2. content size
