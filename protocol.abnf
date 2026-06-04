@@ -1,0 +1,36 @@
+; gentoo
+package = 1*(VCHAR) "/" 1*(VCHAR)
+
+; commands
+    ; init a handshake
+    ; 1. version number
+hey_request = "HEY " 1*DIGIT CRLF
+    ; request to build packages
+    ; 1.. packages to build
+build_request = "BUILD " package *(" " package) CRLF 
+    ; update the configuration
+    ; 1. number of files to send
+cfg_request = "CONFIG " 1*DIGIT CRLF
+    ; init sending a file
+    ; 1. absolute path
+    ; 2. sha3-512 checksum of the file
+    ; 3. number of parts
+send_request = "SEND " 1*VCHAR " " 1*VCHAR " " 1*DIGIT CRLF
+    ; send a part of a file
+    ; 1. part number
+    ; 2. content size
+    ; 3. content
+part_request = "PART " 1*DIGIT " " 1*DIGIT " " 1*OCTET CRLF
+
+; responses
+    ; finish handshake
+    ; 1. version number
+    ; 2. max part size
+hoy_response = "HOY " 1*DIGIT " " 1*DIGIT CRLF
+    ; success
+ok_response = "OK" CRLF
+    ; success, can stop now (e.g., do not continue a SEND with PART)
+done_response = "DONE" CRLF
+    ; there is an error
+    ; 1. reason
+error_response = "ERROR " 1*VCHAR CRLF
