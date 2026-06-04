@@ -34,7 +34,7 @@ const (
 	ErrorResponse ResponseCommand = "ERROR"
 )
 
-var packageRegexp = regexp.MustCompile(`^[a-zA-Z-]+/[a-zA-Z-]$`)
+var packageRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$`)
 
 // IsPackage indicates if the string is a valid Gentoo package.
 func IsPackage(s string) bool {
@@ -42,9 +42,10 @@ func IsPackage(s string) bool {
 }
 
 // Send a command.
-func Send(cmd string, args [][]byte) {
-	a := bytes.Join(args, []byte(" "))
+func Send(cmd string, args [][]byte) []byte {
+	a := append([]byte(cmd+" "), bytes.Join(args, []byte(" "))...)
 	a = append(a, '\r', '\n')
+	return a
 }
 
 type Command struct {

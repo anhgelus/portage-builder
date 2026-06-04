@@ -2,9 +2,9 @@ package proto
 
 import (
 	"bytes"
-	"crypto/sha3"
 	"fmt"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -39,7 +39,7 @@ func (r Response) Send() {
 type ServerHandler interface {
 	HandleBuildRequest(packages []string) Response
 	HandleConfigRequest(nbr uint) Response
-	HandleSendRequest(path string, nbrParts uint, checksum [512]byte) Response
+	HandleSendRequest(path string, nbrParts uint, checksum [64]byte) Response
 	HandlePartRequest(part uint, content []byte) Response
 }
 
@@ -74,7 +74,7 @@ func (s *Server) Handle(b []byte) Response {
 			if !IsPackage(string(pkg)) {
 				return NewErrorResponse(
 					"invalid package",
-					fmt.Errorf("%s is not a package", pkg))
+					fmt.Errorf("%q is not a package", pkg))
 			}
 			conv[i] = string(pkg)
 		}
@@ -98,6 +98,11 @@ func (s *Server) Handle(b []byte) Response {
 				"invalid command",
 				fmt.Errorf("must have 3 args"))
 		}
+		if strings.ContainsRune(string(path), ' ') {
+			return NewErrorResponse(
+				"invalid command",
+				fmt.Errorf("path must not have a space"))
+		}
 		if !utf8.Valid(path) {
 			return NewErrorResponse(
 				"invalid command",
@@ -114,10 +119,10 @@ func (s *Server) Handle(b []byte) Response {
 		if err != nil {
 			return NewErrorResponse("invalid command", err)
 		}
-		if len(next) != sha3.New512().Size() {
-			return NewErrorResponse("invalid command", fmt.Errorf("invalid SHA3-512"))
+		if len(next) != 64 {
+			return NewErrorResponse("invalid command", fmt.Errorf("invalid SHA3-512, % x", next))
 		}
-		return s.HandleSendRequest(string(path), uint(nbr), [512]byte(next))
+		return s.HandleSendRequest(string(path), uint(nbr), [64]byte(next))
 	case PartRequest:
 		rp, next, ok := bytes.Cut(cmd.Args, []byte(" "))
 		if !ok {
