@@ -2,6 +2,7 @@ package proto
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"unicode/utf8"
@@ -38,9 +39,13 @@ func prepareCommand(cmd string, args any) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	a := append([]byte(cmd+" "), b...)
-	a = append(a, '\r', '\n')
-	return a, nil
+	var buf bytes.Buffer
+	buf.Grow(len(b) + len(cmd) + 3)
+	buf.WriteString(cmd)
+	buf.WriteRune(' ')
+	buf.Write(b)
+	buf.WriteString("\r\n")
+	return buf.Bytes(), nil
 }
 
 type Command struct {
@@ -137,4 +142,12 @@ type HoyArg struct {
 
 type ErrorArg struct {
 	Error string
+}
+
+// Communication handles writing and reading data.
+// Can be used concurrently.
+type Communication interface {
+	Write(context.Context, []byte) error
+	Read(context.Context) ([]byte, error)
+	Close() error
 }

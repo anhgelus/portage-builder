@@ -62,9 +62,6 @@ func UnmarshalArgs(b []byte, v any) error {
 
 func MarshalArgs(v any) ([]byte, error) {
 	val := reflect.ValueOf(v)
-	if val.IsZero() {
-		return nil, nil
-	}
 	if val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return nil, nil

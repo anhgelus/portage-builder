@@ -28,74 +28,80 @@ func NewErrorResponse(why string, err error) Response {
 }
 
 // Send the [Response].
-func (r Response) Send(_ context.Context) error {
-	_, err := prepareCommand(string(r.Cmd), r.Args)
-	//TODO: send
-	return err
+func (r Response) Send(ctx context.Context, com Communication) error {
+	b, err := prepareCommand(string(r.Cmd), r.Args)
+	if err != nil {
+		return err
+	}
+	return com.Write(ctx, b)
 }
 
 // ServerHandler handles [Request].
 type ServerHandler interface {
-	HandleBuildRequest(context.Context, BuildArg) Response
-	HandleConfigRequest(context.Context, CfgArg) Response
-	HandleSendRequest(context.Context, SendArg) Response
-	HandlePartRequest(context.Context, PartArg) Response
+	HandleBuildRequest(context.Context, Communication, BuildArg) Response
+	HandleConfigRequest(context.Context, Communication, CfgArg) Response
+	HandleSendRequest(context.Context, Communication, SendArg) Response
+	HandlePartRequest(context.Context, Communication, PartArg) Response
 }
 
 type Server struct {
+	Communication
 	ServerHandler
 	// MaxRequestSize in bytes
 	MaxRequestSize uint
 }
 
-func handle[T any](ctx context.Context, cmd Command, fn func(context.Context, T) Response) Response {
+func handle[T any](ctx context.Context, s *Server, cmd Command, fn func(context.Context, Communication, T) Response) Response {
 	var arg T
 	err := UnmarshalArgs(cmd.Args, &arg)
 	if err != nil {
 		return NewErrorResponse("invalid command", err)
 	}
-	return fn(ctx, arg)
+	return fn(ctx, s, arg)
 }
 
 // Handle and dispatch incoming [Request] to the [ServerHandler].
-func (s *Server) Handle(ctx context.Context, b []byte) Response {
+func (s *Server) Handle(ctx context.Context, b []byte) error {
 	if len(b) >= int(s.MaxRequestSize) {
-		return NewErrorResponse("too long", errors.New("request exceed server's MaxReqSize"))
+		return NewErrorResponse("too long", errors.New("request exceed server's MaxReqSize")).
+			Send(ctx, s)
 	}
 	cmd, err := ParseCommand(b)
 	if err != nil {
-		return NewErrorResponse("invalid command", err)
+		return NewErrorResponse("invalid command", err).Send(ctx, s)
 	}
+	var resp Response
 	switch RequestCommand(cmd.Cmd) {
 	case HeyRequest:
 		var arg HeyArg
 		err := UnmarshalArgs(cmd.Args, &arg)
 		if err != nil {
-			return NewErrorResponse("invalid command", err)
+			resp = NewErrorResponse("invalid command", err)
+		} else if Version != arg.Version {
+			resp = NewErrorResponse("failed hey", ErrVersionNotSupported)
+		} else {
+			resp = NewResponse(HoyResponse, HoyArg{arg.Version, s.MaxRequestSize})
 		}
-		if Version != arg.Version {
-			return NewErrorResponse("failed hey", ErrVersionNotSupported)
-		}
-		return NewResponse(HoyResponse, HoyArg{arg.Version, s.MaxRequestSize})
 	case BuildRequest:
-		return handle(ctx, cmd, s.HandleBuildRequest)
+		resp = handle(ctx, s, cmd, s.HandleBuildRequest)
 	case CfgRequest:
-		return handle(ctx, cmd, s.HandleConfigRequest)
+		resp = handle(ctx, s, cmd, s.HandleConfigRequest)
 	case SendRequest:
-		return handle(ctx, cmd, s.HandleSendRequest)
+		resp = handle(ctx, s, cmd, s.HandleSendRequest)
 	case PartRequest:
-		return handle(ctx, cmd, s.HandlePartRequest)
+		resp = handle(ctx, s, cmd, s.HandlePartRequest)
 	default:
-		return NewResponse(ErrorResponse, []byte("unknown command"))
+		resp = NewResponse(ErrorResponse, []byte("unknown command"))
 	}
+	return resp.Send(ctx, s)
 }
 
 // SendOK to the client.
 func (s *Server) SendOK() {
-	NewResponse(OkResponse, nil)
+	NewResponse(OkResponse, struct{}{})
 }
 
 // SendDone to the client.
 func (s *Server) SendDone() {
-	NewResponse(DoneResponse, nil)
+	NewResponse(DoneResponse, struct{}{})
 }

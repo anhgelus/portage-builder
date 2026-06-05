@@ -11,11 +11,11 @@ import (
 // See [NewRequest].
 type Request struct {
 	Cmd  RequestCommand
-	Args []any
+	Args any
 }
 
 // NewRequest creates a [Request].
-func NewRequest(cmd RequestCommand, args ...any) Request {
+func NewRequest(cmd RequestCommand, args any) Request {
 	return Request{cmd, args}
 }
 
@@ -54,14 +54,23 @@ func (e ErrResponse) Unwrap() error {
 }
 
 // Send the [Request].
-func (r Request) Send(_ context.Context) (Command, error) {
-	_, err := prepareCommand(string(r.Cmd), r.Args)
+func (r Request) Send(ctx context.Context, com Communication) (Command, error) {
+	b, err := prepareCommand(string(r.Cmd), r.Args)
 	if err != nil {
 		return Command{}, err
 	}
-	//TODO: send
-	// TODO: waits for the response
-	var cmd Command
+	err = com.Write(ctx, b)
+	if err != nil {
+		return Command{}, err
+	}
+	resp, err := com.Read(ctx)
+	if err != nil {
+		return Command{}, err
+	}
+	cmd, err := ParseCommand(resp)
+	if err != nil {
+		return cmd, err
+	}
 	if cmd.Cmd == string(ErrorResponse) {
 		var arg ErrorArg
 		err = UnmarshalArgs(cmd.Args, &arg)
@@ -74,6 +83,7 @@ func (r Request) Send(_ context.Context) (Command, error) {
 }
 
 type Client struct {
+	Communication
 	Version        uint8
 	MaxRequestSize uint
 }
@@ -116,9 +126,9 @@ func NewInvalidResponseCommand(cmd *Command, exp ResponseCommand) ErrInvalidResp
 }
 
 // NewClient creates a new [Client].
-func NewClient(ctx context.Context) (*Client, error) {
-	c := &Client{}
-	cmd, err := NewRequest(HeyRequest, Version).Send(ctx)
+func NewClient(ctx context.Context, com Communication) (*Client, error) {
+	c := &Client{Communication: com}
+	cmd, err := NewRequest(HeyRequest, HeyArg{Version}).Send(ctx, com)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +150,7 @@ func NewClient(ctx context.Context) (*Client, error) {
 
 // RequestBuild of [Package].
 func (c *Client) RequestBuild(ctx context.Context, arg BuildArg) error {
-	cmd, err := NewRequest(BuildRequest, arg).Send(ctx)
+	cmd, err := NewRequest(BuildRequest, arg).Send(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -152,7 +162,7 @@ func (c *Client) RequestBuild(ctx context.Context, arg BuildArg) error {
 
 // RequestConfig updates the distant config.
 func (c *Client) RequestConfig(ctx context.Context, arg CfgArg) error {
-	cmd, err := NewRequest(CfgRequest, arg).Send(ctx)
+	cmd, err := NewRequest(CfgRequest, arg).Send(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -165,7 +175,7 @@ func (c *Client) RequestConfig(ctx context.Context, arg CfgArg) error {
 // RequestSend file to the server.
 // Returns false if the file is already on the server.
 func (c *Client) RequestSend(ctx context.Context, arg SendArg) (bool, error) {
-	cmd, err := NewRequest(SendRequest, arg).Send(ctx)
+	cmd, err := NewRequest(SendRequest, arg).Send(ctx, c)
 	if err != nil {
 		return false, err
 	}
@@ -181,7 +191,7 @@ func (c *Client) RequestSend(ctx context.Context, arg SendArg) (bool, error) {
 
 // RequestPart sends a part of the file.
 func (c *Client) RequestPart(ctx context.Context, arg PartArg) error {
-	cmd, err := NewRequest(PartRequest, arg).Send(ctx)
+	cmd, err := NewRequest(PartRequest, arg).Send(ctx, c)
 	if err != nil {
 		return err
 	}

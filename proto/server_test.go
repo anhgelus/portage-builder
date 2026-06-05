@@ -13,24 +13,26 @@ type dummyServer struct {
 	res any
 }
 
-func (s *dummyServer) HandleBuildRequest(_ context.Context, arg BuildArg) Response {
+var dummyOk = Response{Cmd: OkResponse, Args: struct{}{}}
+
+func (s *dummyServer) HandleBuildRequest(_ context.Context, _ Communication, arg BuildArg) Response {
 	s.res = arg
-	return Response{}
+	return dummyOk
 }
 
-func (s *dummyServer) HandleConfigRequest(_ context.Context, arg CfgArg) Response {
+func (s *dummyServer) HandleConfigRequest(_ context.Context, _ Communication, arg CfgArg) Response {
 	s.res = arg
-	return Response{}
+	return dummyOk
 }
 
-func (s *dummyServer) HandleSendRequest(_ context.Context, arg SendArg) Response {
+func (s *dummyServer) HandleSendRequest(_ context.Context, _ Communication, arg SendArg) Response {
 	s.res = arg
-	return Response{}
+	return dummyOk
 }
 
-func (s *dummyServer) HandlePartRequest(_ context.Context, arg PartArg) Response {
+func (s *dummyServer) HandlePartRequest(_ context.Context, _ Communication, arg PartArg) Response {
 	s.res = arg
-	return Response{}
+	return dummyOk
 }
 
 func genPackage() *rapid.Generator[*Package] {
@@ -86,11 +88,17 @@ func genRequest() *rapid.Generator[request] {
 }
 
 func TestServer_Handle(t *testing.T) {
-	s := &Server{&dummyServer{}, 1024 * 1024 * 1024}
+	com := newDummyCom()
+	s := &Server{com, &dummyServer{}, 1024 * 1024 * 1024}
+	defer s.Close()
 	rapid.Check(t, func(t *rapid.T) {
 		req := genRequest().Draw(t, "req")
-		resp := s.Handle(t.Context(), req.body)
-		if resp.Cmd == ErrorResponse {
+		err := s.Handle(t.Context(), req.body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := ParseCommand(<-com.out)
+		if resp.Cmd == string(ErrorResponse) {
 			t.Fatal(resp.Args)
 		}
 		if req.cmd == HeyRequest {
