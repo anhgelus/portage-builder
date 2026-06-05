@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"regexp"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -34,18 +32,15 @@ const (
 	ErrorResponse ResponseCommand = "ERROR"
 )
 
-var packageRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$`)
-
-// IsPackage indicates if the string is a valid Gentoo package.
-func IsPackage(s string) bool {
-	return packageRegexp.MatchString(s)
-}
-
 // Send a command.
-func Send(cmd string, args [][]byte) []byte {
-	a := append([]byte(cmd+" "), bytes.Join(args, []byte(" "))...)
+func Send(cmd string, args any) ([]byte, error) {
+	b, err := MarshalArgs(args)
+	if err != nil {
+		return nil, err
+	}
+	a := append([]byte(cmd+" "), b...)
 	a = append(a, '\r', '\n')
-	return a
+	return a, nil
 }
 
 type Command struct {
@@ -59,7 +54,7 @@ type ErrInvalidCommand struct {
 }
 
 func (e ErrInvalidCommand) Error() string {
-	return fmt.Sprintf("invalid command: %s (%q)", e.Reason, e.given)
+	return fmt.Sprintf("%s (%q)", e.Reason, e.given)
 }
 
 func (e ErrInvalidCommand) As(r any) bool {
@@ -86,29 +81,48 @@ func (e ErrInvalidCommand) Unwrap() error {
 }
 
 var (
-	ErrNotUtf8     = errors.New("command is not utf8 encoded")
+	ErrNotUtf8     = errors.New("not utf8 encoded")
 	ErrMissingCRLF = errors.New("missing CRLF")
 )
 
 // ParseCommand from raw bytes.
 // Return [ErrInvalidCommand] if the given bytes are invalid.
 func ParseCommand(b []byte) (command Command, err error) {
-	cmd, args, f := bytes.Cut(b, []byte(" "))
+	nb := bytes.TrimSuffix(b, []byte("\r\n"))
+	if len(nb) == len(b) {
+		err = ErrInvalidCommand{b, ErrMissingCRLF}
+		return
+	}
+	cmd, args, _ := bytes.Cut(nb, []byte(" "))
 	if !utf8.Valid(cmd) {
 		err = ErrInvalidCommand{b, ErrNotUtf8}
 		return
 	}
 	command.Cmd = string(cmd)
-	if f {
-		command.Args = bytes.TrimSuffix(args, []byte("\r\n"))
-		if len(args) == len(command.Args) {
-			err = ErrInvalidCommand{b, ErrMissingCRLF}
-		}
-	} else {
-		command.Cmd = strings.TrimSuffix(command.Cmd, "\r\n")
-		if len(command.Cmd) == len(cmd) {
-			err = ErrInvalidCommand{b, ErrMissingCRLF}
-		}
-	}
+	command.Args = args
 	return
+}
+
+type HeyArg struct {
+	Version uint8
+}
+
+type BuildArg struct {
+	Packages []*Package
+}
+
+type CfgArg struct {
+	Files uint8
+}
+
+type SendArg struct {
+	Path     string
+	Parts    uint
+	Checksum [64]byte
+}
+
+type PartArg struct {
+	Part    uint
+	Size    uint
+	Content []byte
 }

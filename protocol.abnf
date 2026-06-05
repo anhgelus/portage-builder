@@ -1,3 +1,5 @@
+; variables CBOR_* represent a value encoded with DAG-CBOR
+
 ; gentoo
 package_part = 1*(ASCII / "-")
 package = package_part "/" package_part 
@@ -5,33 +7,33 @@ package = package_part "/" package_part
 ; commands
     ; init a handshake
     ; 1. version number
-hey_request = "HEY " 1*DIGIT CRLF
+hey_request = "HEY " CBOR_UINT8 CRLF
     ; request to build packages
     ; 1.. packages to build
 build_request = "BUILD " package *(" " package) CRLF 
     ; update the configuration
     ; 1. number of files to send
-cfg_request = "CONFIG " 1*DIGIT CRLF
+cfg_request = "CONFIG " CBOR_UINT8 CRLF
     ; init sending a file
     ; 1. absolute path
     ; 2. number of parts
     ; 3. raw sha3-512 checksum of the file
-send_request = "SEND " 1*VCHAR " " 1*DIGIT " " 1*VCHAR CRLF
+send_request = "SEND " CBOR_STRING CBOR_UINT CBOR_BYTES CRLF
     ; send a part of a file
     ; 1. part number
     ; 2. content size
     ; 3. content
-part_request = "PART " 1*DIGIT " " 1*DIGIT " " 1*OCTET CRLF
+part_request = "PART " CBOR_UINT CBOR_BYTES CRLF
 
 ; responses
     ; finish handshake
     ; 1. version number
     ; 2. max part size
-hoy_response = "HOY " 1*DIGIT " " 1*DIGIT CRLF
+hoy_response = "HOY " CBOR_UINT8 CBOR_UINT CRLF
     ; success
 ok_response = "OK" CRLF
     ; success, can stop now (e.g., do not continue a SEND with PART)
 done_response = "DONE" CRLF
     ; there is an error
     ; 1. reason
-error_response = "ERROR " 1*VCHAR CRLF
+error_response = "ERROR " CBOR_STRING CRLF
