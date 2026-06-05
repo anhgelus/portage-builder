@@ -72,8 +72,6 @@ func optionsOf(field reflect.StructField) options {
 	var opts options
 	if tag, ok := field.Tag.Lookup("cbor"); ok {
 		opts = parseTag(tag)
-	} else if tag, ok := field.Tag.Lookup("json"); ok {
-		opts = parseTag(tag)
 	}
 	if opts.name == "" {
 		opts.name = field.Name
