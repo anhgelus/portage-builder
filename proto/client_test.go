@@ -8,7 +8,7 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	s := &Server{nil, &dummyServer{}, 1024 * 1024 * 1024}
+	s := NewServer(nil, &dummyServer{}, 1024*1024*1024)
 	ctx := context.Background()
 	rapid.Check(t, func(t *rapid.T) {
 		dualCom := dummyDualCom{newDummyCom(), newDummyCom()}

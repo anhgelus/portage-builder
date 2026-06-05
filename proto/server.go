@@ -51,6 +51,11 @@ type Server struct {
 	MaxRequestSize uint
 }
 
+// NewServer creates a [Server].
+func NewServer(com Communication, handler ServerHandler, maxRequestSize uint) *Server {
+	return &Server{com, handler, maxRequestSize}
+}
+
 func handle[T any](ctx context.Context, s *Server, cmd Command, fn func(context.Context, Communication, T) Response) Response {
 	var arg T
 	err := UnmarshalArgs(cmd.Args, &arg)
