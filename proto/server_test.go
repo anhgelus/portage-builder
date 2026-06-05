@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"context"
 	"crypto/sha3"
 	"reflect"
 	"strings"
@@ -13,23 +14,23 @@ type dummyServer struct {
 	res any
 }
 
-func (s *dummyServer) HandleBuildRequest(packages []*Package) Response {
-	s.res = BuildArg{packages}
+func (s *dummyServer) HandleBuildRequest(_ context.Context, arg BuildArg) Response {
+	s.res = arg
 	return Response{}
 }
 
-func (s *dummyServer) HandleConfigRequest(nbr uint8) Response {
-	s.res = CfgArg{nbr}
+func (s *dummyServer) HandleConfigRequest(_ context.Context, arg CfgArg) Response {
+	s.res = arg
 	return Response{}
 }
 
-func (s *dummyServer) HandleSendRequest(path string, nbrParts uint, checksum [64]byte) Response {
-	s.res = SendArg{path, nbrParts, checksum}
+func (s *dummyServer) HandleSendRequest(_ context.Context, arg SendArg) Response {
+	s.res = arg
 	return Response{}
 }
 
-func (s *dummyServer) HandlePartRequest(part uint, content []byte) Response {
-	s.res = PartArg{part, uint(len(content)), content}
+func (s *dummyServer) HandlePartRequest(_ context.Context, arg PartArg) Response {
+	s.res = arg
 	return Response{}
 }
 
@@ -89,7 +90,7 @@ func TestServer_Handle(t *testing.T) {
 	s := &Server{&dummyServer{}, 1024 * 1024 * 1024}
 	rapid.Check(t, func(t *rapid.T) {
 		req := genRequest().Draw(t, "req")
-		resp := s.Handle(req.body)
+		resp := s.Handle(t.Context(), req.body)
 		if resp.Cmd == ErrorResponse {
 			var jn strings.Builder
 			for _, b := range resp.Args {

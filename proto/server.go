@@ -1,7 +1,9 @@
 package proto
 
 import (
+	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 )
 
@@ -34,19 +36,32 @@ func (r Response) Send() {
 
 // ServerHandler handles [Request].
 type ServerHandler interface {
-	HandleBuildRequest(packages []*Package) Response
-	HandleConfigRequest(nbr uint8) Response
-	HandleSendRequest(path string, nbrParts uint, checksum [64]byte) Response
-	HandlePartRequest(part uint, content []byte) Response
+	HandleBuildRequest(context.Context, BuildArg) Response
+	HandleConfigRequest(context.Context, CfgArg) Response
+	HandleSendRequest(context.Context, SendArg) Response
+	HandlePartRequest(context.Context, PartArg) Response
 }
 
 type Server struct {
 	ServerHandler
-	MaxPartLength uint
+	// MaxRequestSize in bytes
+	MaxRequestSize uint
+}
+
+func handle[T any](ctx context.Context, cmd Command, fn func(context.Context, T) Response) Response {
+	var arg T
+	err := UnmarshalArgs(cmd.Args, &arg)
+	if err != nil {
+		return NewErrorResponse("invalid command", err)
+	}
+	return fn(ctx, arg)
 }
 
 // Handle and dispatch incoming [Request] to the [ServerHandler].
-func (s *Server) Handle(b []byte) Response {
+func (s *Server) Handle(ctx context.Context, b []byte) Response {
+	if len(b) >= int(s.MaxRequestSize) {
+		return NewErrorResponse("too long", errors.New("request exceed server's MaxReqSize"))
+	}
 	cmd, err := ParseCommand(b)
 	if err != nil {
 		return NewErrorResponse("invalid command", err)
@@ -66,38 +81,15 @@ func (s *Server) Handle(b []byte) Response {
 		return NewResponse(
 			HoyResponse,
 			[]byte{arg.Version},
-			binary.BigEndian.AppendUint64(nil, uint64(s.MaxPartLength)))
+			binary.BigEndian.AppendUint64(nil, uint64(s.MaxRequestSize)))
 	case BuildRequest:
-		var arg BuildArg
-		err := UnmarshalArgs(cmd.Args, &arg)
-		if err != nil {
-			return NewErrorResponse("invalid command", err)
-		}
-		return s.HandleBuildRequest(arg.Packages)
+		return handle(ctx, cmd, s.HandleBuildRequest)
 	case CfgRequest:
-		var arg CfgArg
-		err := UnmarshalArgs(cmd.Args, &arg)
-		if err != nil {
-			return NewErrorResponse("invalid command", err)
-		}
-		return s.HandleConfigRequest(arg.Files)
+		return handle(ctx, cmd, s.HandleConfigRequest)
 	case SendRequest:
-		var arg SendArg
-		err := UnmarshalArgs(cmd.Args, &arg)
-		if err != nil {
-			return NewErrorResponse("invalid command", err)
-		}
-		return s.HandleSendRequest(arg.Path, arg.Parts, arg.Checksum)
+		return handle(ctx, cmd, s.HandleSendRequest)
 	case PartRequest:
-		var arg PartArg
-		err := UnmarshalArgs(cmd.Args, &arg)
-		if err != nil {
-			return NewErrorResponse("invalid command", err)
-		}
-		if arg.Size >= s.MaxPartLength || len(arg.Content) != int(arg.Size) {
-			return NewErrorResponse("invalid command", fmt.Errorf("invalid length"))
-		}
-		return s.HandlePartRequest(arg.Part, arg.Content)
+		return handle(ctx, cmd, s.HandlePartRequest)
 	default:
 		return NewResponse(ErrorResponse, []byte("unknown command"))
 	}
