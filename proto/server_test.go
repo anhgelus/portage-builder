@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha3"
 	"reflect"
-	"strings"
 	"testing"
 
 	"pgregory.net/rapid"
@@ -78,7 +77,7 @@ func genRequest() *rapid.Generator[request] {
 			content := rapid.SliceOfN(rapid.Byte(), 1, -1).Draw(t, "content")
 			args = PartArg{part, uint(len(content)), content}
 		}
-		b, err := Send(string(cmd), args)
+		b, err := prepareCommand(string(cmd), args)
 		if err != nil {
 			panic(err)
 		}
@@ -92,12 +91,7 @@ func TestServer_Handle(t *testing.T) {
 		req := genRequest().Draw(t, "req")
 		resp := s.Handle(t.Context(), req.body)
 		if resp.Cmd == ErrorResponse {
-			var jn strings.Builder
-			for _, b := range resp.Args {
-				jn.WriteString(string(b))
-				jn.WriteRune(' ')
-			}
-			t.Fatal(jn.String())
+			t.Fatal(resp.Args)
 		}
 		if req.cmd == HeyRequest {
 			return

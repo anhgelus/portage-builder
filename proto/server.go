@@ -2,9 +2,7 @@ package proto
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
-	"fmt"
 )
 
 // Response is a command sent from the server to the client.
@@ -12,13 +10,13 @@ import (
 // See [NewResponse].
 type Response struct {
 	Cmd  ResponseCommand
-	Args [][]byte
+	Args any
 }
 
 // NewResponse creates a [Response].
 //
 // See [NewErrorResponse] to create a new [Reponse] containing an [error].
-func NewResponse(cmd ResponseCommand, args ...[]byte) Response {
+func NewResponse(cmd ResponseCommand, args any) Response {
 	return Response{cmd, args}
 }
 
@@ -26,12 +24,14 @@ func NewResponse(cmd ResponseCommand, args ...[]byte) Response {
 //
 // See [NewResponse] to create a simple [Response].
 func NewErrorResponse(why string, err error) Response {
-	return NewResponse(ErrorResponse, []byte(why+":"), []byte(err.Error()))
+	return NewResponse(ErrorResponse, ErrorArg{why + ": " + err.Error()})
 }
 
 // Send the [Response].
-func (r Response) Send() {
-	Send(string(r.Cmd), r.Args)
+func (r Response) Send(_ context.Context) error {
+	_, err := prepareCommand(string(r.Cmd), r.Args)
+	//TODO: send
+	return err
 }
 
 // ServerHandler handles [Request].
@@ -73,15 +73,10 @@ func (s *Server) Handle(ctx context.Context, b []byte) Response {
 		if err != nil {
 			return NewErrorResponse("invalid command", err)
 		}
-		if Version != uint(arg.Version) {
-			return NewErrorResponse(
-				"unsupported version",
-				fmt.Errorf("don't support %v, only %v", arg.Version, Version))
+		if Version != arg.Version {
+			return NewErrorResponse("failed hey", ErrVersionNotSupported)
 		}
-		return NewResponse(
-			HoyResponse,
-			[]byte{arg.Version},
-			binary.BigEndian.AppendUint64(nil, uint64(s.MaxRequestSize)))
+		return NewResponse(HoyResponse, HoyArg{arg.Version, s.MaxRequestSize})
 	case BuildRequest:
 		return handle(ctx, cmd, s.HandleBuildRequest)
 	case CfgRequest:
@@ -97,10 +92,10 @@ func (s *Server) Handle(ctx context.Context, b []byte) Response {
 
 // SendOK to the client.
 func (s *Server) SendOK() {
-	NewResponse(OkResponse)
+	NewResponse(OkResponse, nil)
 }
 
 // SendDone to the client.
 func (s *Server) SendDone() {
-	NewResponse(DoneResponse)
+	NewResponse(DoneResponse, nil)
 }

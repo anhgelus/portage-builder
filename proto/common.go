@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-const Version uint = 1
+const Version uint8 = 1
 
 // RequestCommand identifies the command sent by a client.
 type RequestCommand string
@@ -32,8 +32,8 @@ const (
 	ErrorResponse ResponseCommand = "ERROR"
 )
 
-// Send a command.
-func Send(cmd string, args any) ([]byte, error) {
+// prepareCommand a command.
+func prepareCommand(cmd string, args any) ([]byte, error) {
 	b, err := MarshalArgs(args)
 	if err != nil {
 		return nil, err
@@ -80,6 +80,7 @@ func (e ErrInvalidCommand) Unwrap() error {
 	return e.Reason
 }
 
+// Errors coming from [ParseCommand].
 var (
 	ErrNotUtf8     = errors.New("not utf8 encoded")
 	ErrMissingCRLF = errors.New("missing CRLF")
@@ -103,6 +104,8 @@ func ParseCommand(b []byte) (command Command, err error) {
 	return
 }
 
+var ErrVersionNotSupported = errors.New("version not supported")
+
 type HeyArg struct {
 	Version uint8
 }
@@ -125,4 +128,13 @@ type PartArg struct {
 	Part    uint
 	Size    uint
 	Content []byte
+}
+
+type HoyArg struct {
+	Version        uint8
+	MaxRequestSize uint
+}
+
+type ErrorArg struct {
+	Error string
 }
