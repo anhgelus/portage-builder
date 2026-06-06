@@ -77,9 +77,9 @@ func Unmarshal(b []byte, v any) (rest []byte, err error) {
 	case byteString:
 		err = unmarshalBytes(ptr, a, r)
 	case textString:
-		sub := reflect.New(ptr.Elem().Type())
+		sub := reflect.New(reflect.TypeFor[string]())
 		err = unmarshalBytes(sub, a, r)
-		ptr.Elem().Set(sub.Elem())
+		ptr.Elem().Set(sub.Elem().Convert(ptr.Elem().Type()))
 	case array:
 		err = unmarshalArray(ptr, a, r)
 	case mapT:
@@ -93,7 +93,7 @@ func Unmarshal(b []byte, v any) (rest []byte, err error) {
 		case 21:
 			ptr.Elem().Set(reflect.ValueOf(true))
 		case 22:
-			return r.Drain(), nil
+			ptr.SetZero()
 		default:
 			err = fmt.Errorf("%w: unknown simple values, for data [% x]", ErrNotCBOR, b)
 		}
@@ -193,15 +193,15 @@ func unmarshalKeyVal(r *ByteReader, t reflect.Type) (string, reflect.Value, erro
 	var s string
 	rest, err := Unmarshal(r.Drain(), &s)
 	if err != nil {
-		return "", reflect.ValueOf(nil), err
+		return "", reflect.Zero(t), err
 	}
 	ptr := reflect.New(t)
 	rest, err = Unmarshal(rest, ptr.Interface())
 	if err != nil {
-		return "", reflect.ValueOf(nil), err
+		return "", reflect.Zero(t), err
 	}
 	r.Reset(rest)
-	return s, ptr.Elem(), err
+	return s, ptr.Elem(), nil
 }
 
 type fieldInfo struct {
@@ -217,8 +217,7 @@ func unmarshalMap(ptr reflect.Value, a additionalInformation, r *ByteReader) err
 	if !isMap && k != reflect.Struct && !isAny {
 		return fmt.Errorf(
 			"%w: must use a Go map or a struct for a CBOR map, not %v",
-			ErrInvalidType, k,
-		)
+			ErrInvalidType, k)
 	}
 	t := ptr.Elem().Type()
 	if isMap && t.Key().Kind() != reflect.String {
@@ -234,8 +233,7 @@ func unmarshalMap(ptr reflect.Value, a additionalInformation, r *ByteReader) err
 	} else {
 		mp = reflect.MakeMapWithSize(
 			reflect.MapOf(reflect.TypeFor[string](), reflect.TypeFor[any]()),
-			int(ln),
-		)
+			int(ln))
 	}
 	for range ln {
 		key, in, err := unmarshalKeyVal(r, mp.Type().Elem())

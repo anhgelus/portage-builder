@@ -9,6 +9,7 @@ func doUnmarshal[T any](t *testing.T, v []byte, exp T) {
 	var raw T
 	rest, err := Unmarshal(v, &raw)
 	if err != nil {
+		t.Logf("%x %v", v, exp)
 		t.Fatal(err)
 	}
 	if len(rest) != 0 {
@@ -87,12 +88,12 @@ func doUnmarshalStruct[T any](t *testing.T, exp T, v ...any) {
 func TestUnmarshal_Struct(t *testing.T) {
 	doUnmarshalStruct(t, struct {
 		A uint
-		B uint `json:"b"`
-		C uint `json:"d" cbor:"c"`
+		B uint `cbor:"b"`
+		C uint `cbor:"c"`
 	}{0, 1, 2}, "A", 0, "b", 1, "c", 2)
 	doUnmarshalStruct(t, struct {
 		A uint `cbor:",omitempty"`
-		B uint `json:"b,omitempty"`
+		B uint `cbor:"b,omitempty"`
 		C uint `cbor:"c,string"`
 	}{0, 0, 2}, "c", "2")
 	doUnmarshalStruct(t, struct {

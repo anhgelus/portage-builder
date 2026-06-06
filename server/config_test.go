@@ -45,8 +45,7 @@ const (
 public_key_file = ""
 private_key_file = ""
 [users.foo]
-name = "Foo"
-`
+name = "Foo"`
 )
 
 func TestConfig_Invalid(t *testing.T) {

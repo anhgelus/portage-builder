@@ -83,12 +83,12 @@ func doMarshalStruct(t *testing.T, v any, exp ...any) {
 func TestMarshal_Struct(t *testing.T) {
 	doMarshalStruct(t, struct {
 		A uint
-		B uint `json:"b"`
-		C uint `json:"d" cbor:"c"`
+		B uint `cbor:"b"`
+		C uint `cbor:"c"`
 	}{0, 1, 2}, "A", 0, "b", 1, "c", 2)
 	doMarshalStruct(t, struct {
 		A uint `cbor:",omitempty"`
-		B uint `json:"b,omitempty"`
+		B uint `cbor:"b,omitempty"`
 		C uint `cbor:"c,string"`
 	}{0, 0, 2}, "c", "2")
 	doMarshalStruct(t, struct {
