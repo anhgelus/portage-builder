@@ -1,6 +1,6 @@
 package common
 
 const (
-	PkgPath     = "/pkg"
-	RequestPath = "/request"
+	PkgChannel     = "pkg"
+	RequestChannel = "request"
 )

@@ -27,7 +27,6 @@ type User struct {
 type Keys struct {
 	// Perms used to store the keys.
 	Perms          os.FileMode `toml:"permissions"`
-	PublicKeyFile  string      `toml:"public_key_file"`
 	PrivateKeyFile string      `toml:"private_key_file"`
 }
 
@@ -77,7 +76,7 @@ func (e ErrInvalidConfig) Is(err error) bool {
 	}
 }
 
-var requiredKeys = [][]string{{"server_keys", "public_key_file"}, {"server_keys", "private_key_file"}}
+var requiredKeys = [][]string{{"server_keys", "private_key_file"}}
 
 const (
 	defaultPort           uint        = 2020

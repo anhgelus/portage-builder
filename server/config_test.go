@@ -42,7 +42,6 @@ func TestConfig_Default(t *testing.T) {
 const (
 	missingServerKeys    = `port = 2020`
 	missingUserPublicKey = `[server_keys]
-public_key_file = ""
 private_key_file = ""
 [users.foo]
 name = "Foo"`
@@ -62,7 +61,7 @@ func TestConfig_Invalid(t *testing.T) {
 	if !ok {
 		t.Fatal("expecting ErrInvalidConfig, not ", err)
 	}
-	if !slices.Equal(cv.KeysMissing, []string{"server_keys.public_key_file", "server_keys.private_key_file"}) {
+	if !slices.Equal(cv.KeysMissing, []string{"server_keys.private_key_file"}) {
 		t.Error("invalid missing keys: ", cv.KeysMissing)
 	}
 
