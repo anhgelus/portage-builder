@@ -1,0 +1,14 @@
+port = 2020
+max_request_size = 1024  #  in Kio
+
+[server_keys]
+permissions = 0o600
+public_key_file = "/etc/portage-builderd/key.pub"
+private_key_file = "/etc/portage-builderd/key"
+
+[users.foo]
+# name = "Foo"
+public_key = "foo_pub_key"
+
+[users.bar]
+public_key = "bar_pub_key"
