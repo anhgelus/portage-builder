@@ -19,3 +19,7 @@ func ChecksumOf(fs fs.FS, path string) ([64]byte, error) {
 	}
 	return sha3.Sum512(b), nil
 }
+
+func ChecksumOfBytes(b []byte) [64]byte {
+	return sha3.Sum512(b)
+}

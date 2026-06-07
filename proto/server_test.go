@@ -3,7 +3,6 @@ package proto
 import (
 	"bytes"
 	"context"
-	"io"
 	"reflect"
 	"testing"
 
@@ -16,33 +15,35 @@ type dummyServer struct {
 
 var dummyOk = Response{Cmd: OkResponse, Args: struct{}{}}
 
-func (s *dummyServer) HandleBuildRequest(_ context.Context, _ io.ReadWriteCloser, arg BuildArg) Response {
+func (s *dummyServer) HandleBuildRequest(_ context.Context, arg BuildArg) Response {
 	s.res = arg
 	return dummyOk
 }
 
-func (s *dummyServer) HandleConfigRequest(_ context.Context, _ io.ReadWriteCloser, arg CfgArg) Response {
+func (s *dummyServer) HandleConfigRequest(_ context.Context, arg CfgArg) Response {
 	s.res = arg
 	return dummyOk
 }
 
-func (s *dummyServer) HandleSendRequest(_ context.Context, _ io.ReadWriteCloser, arg SendArg) Response {
+func (s *dummyServer) HandleSendRequest(_ context.Context, arg SendArg) Response {
 	s.res = arg
 	return dummyOk
 }
 
-func (s *dummyServer) HandlePartRequest(_ context.Context, _ io.ReadWriteCloser, arg PartArg) Response {
+func (s *dummyServer) HandlePartRequest(_ context.Context, arg PartArg) Response {
 	s.res = arg
 	return dummyOk
 }
+
+func (s *dummyServer) Close()
 
 func TestServer_Handle(t *testing.T) {
 	com := newDummyCom()
-	s := NewServer(com, &dummyServer{}, 1024*1024)
+	s := NewServer(&dummyServer{}, 1024*1024)
 	defer s.Close()
 	rapid.Check(t, func(t *rapid.T) {
 		req := genRequest().Draw(t, "req")
-		err := s.Handle(t.Context(), bytes.NewBuffer(req.body))
+		err := s.Handle(t.Context(), com, bytes.NewBuffer(req.body))
 		if err != nil {
 			t.Fatal(err)
 		}

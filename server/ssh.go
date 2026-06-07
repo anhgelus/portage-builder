@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"anhgelus.world/portage-builder/common"
+	"anhgelus.world/portage-builder/proto"
 	"anhgelus.world/portage-builder/server/requests"
 	"golang.org/x/crypto/ssh"
 )
@@ -112,13 +113,19 @@ func (s *SSH) ListenAndServe(ctx context.Context) error {
 // handle new tcp [net.Conn].
 func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 	log := common.ContextLogger(ctx)
-	_, chans, reqs, err := ssh.NewServerConn(
+	conn, chans, reqs, err := ssh.NewServerConn(
 		tcp,
 		s.sshConfig)
 	if err != nil {
 		log.Warn("handshake", "error", err)
 		return
 	}
+	defer conn.Close()
+	log = log.With("user", conn.User())
+	srv := proto.NewServer(
+		requests.NewUserHandler(conn.User()),
+		s.serverConfig.MaxRequestSize)
+	defer srv.Close()
 	go ssh.DiscardRequests(reqs)
 	for newChannel := range chans {
 		log = log.With("channel", newChannel.ChannelType())
@@ -128,10 +135,7 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 		case "session":
 			ch, reqs, err = newChannel.Accept()
 			if err == nil {
-				go requests.HandleChannel(
-					common.NewLoggerContext(ctx, log),
-					ch, reqs,
-					s.serverConfig.MaxRequestSize)
+				go requests.HandleChannel(common.NewLoggerContext(ctx, log), srv, ch, reqs)
 			}
 		default:
 			err = newChannel.Reject(ssh.UnknownChannelType, "only support pkg and request")

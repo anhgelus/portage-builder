@@ -8,16 +8,14 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func HandleChannel(ctx context.Context, ch ssh.Channel, reqs <-chan *ssh.Request, maxSize uint32) {
+func HandleChannel(ctx context.Context, srv *proto.Server, ch ssh.Channel, reqs <-chan *ssh.Request) {
 	log := common.ContextLogger(ctx)
 	log.Debug("new channel")
-	srv := proto.NewServer(nil, &Server{}, maxSize)
-	defer srv.Close()
 	go ssh.DiscardRequests(reqs)
 	go func() {
 		for {
 			// everything is synchrone here, because a channel is only used by one connection
-			err := srv.Handle(ctx, ch)
+			err := srv.Handle(ctx, ch, ch)
 			select {
 			case <-ctx.Done():
 				return

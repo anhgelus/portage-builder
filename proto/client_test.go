@@ -8,12 +8,11 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	s := NewServer(nil, &dummyServer{}, 1024*1024*1024)
+	s := NewServer(&dummyServer{}, 1024*1024*1024)
 	ctx := context.Background()
 	rapid.Check(t, func(t *rapid.T) {
 		dualCom := dummyDualCom{newDummyCom(), newDummyCom()}
 		defer dualCom.Close()
-		s.ReadWriteCloser = dualCom.server
 		errc := setupAutoServer(s, &dualCom)
 		cl, err := NewClient(context.Background(), dualCom.client)
 		if err != nil {

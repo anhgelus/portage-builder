@@ -48,42 +48,42 @@ func (r Response) Send(ctx context.Context, com io.ReadWriteCloser) error {
 
 // ServerHandler handles [Request].
 type ServerHandler interface {
-	HandleBuildRequest(context.Context, io.ReadWriteCloser, BuildArg) Response
-	HandleConfigRequest(context.Context, io.ReadWriteCloser, CfgArg) Response
-	HandleSendRequest(context.Context, io.ReadWriteCloser, SendArg) Response
-	HandlePartRequest(context.Context, io.ReadWriteCloser, PartArg) Response
+	Close()
+	HandleBuildRequest(context.Context, BuildArg) Response
+	HandleConfigRequest(context.Context, CfgArg) Response
+	HandleSendRequest(context.Context, SendArg) Response
+	HandlePartRequest(context.Context, PartArg) Response
 }
 
 type Server struct {
-	io.ReadWriteCloser
 	ServerHandler
 	// MaxRequestSize in bytes.
 	MaxRequestSize uint32
 }
 
 // NewServer creates a [Server].
-func NewServer(com io.ReadWriteCloser, handler ServerHandler, maxRequestSize uint32) *Server {
-	return &Server{com, handler, maxRequestSize}
+func NewServer(handler ServerHandler, maxRequestSize uint32) *Server {
+	return &Server{handler, maxRequestSize}
 }
 
 func handle[T any](
 	ctx context.Context,
 	s *Server,
 	cmd Command,
-	fn func(context.Context, io.ReadWriteCloser, T) Response,
+	fn func(context.Context, T) Response,
 ) Response {
 	arg, err := UnmarshalArgsFor[T](cmd.Args)
 	if err != nil {
 		return NewErrorResponse("invalid command", err)
 	}
-	return fn(ctx, s, arg)
+	return fn(ctx, arg)
 }
 
 // Handle and dispatch incoming [Request] to the [ServerHandler].
-func (s *Server) Handle(ctx context.Context, r io.Reader) error {
+func (s *Server) Handle(ctx context.Context, com io.ReadWriteCloser, r io.Reader) error {
 	cmd, err := ParseCommand(ctx, r, s.MaxRequestSize)
 	if err != nil {
-		return NewErrorResponse("invalid command", err).Send(ctx, s)
+		return NewErrorResponse("invalid command", err).Send(ctx, com)
 	}
 	var resp Response
 	switch RequestCommand(cmd.Cmd) {
@@ -107,15 +107,19 @@ func (s *Server) Handle(ctx context.Context, r io.Reader) error {
 	default:
 		resp = NewResponse(ErrorResponse, []byte("unknown command"))
 	}
-	return resp.Send(ctx, s)
+	return resp.Send(ctx, com)
+}
+
+func (s *Server) Close() {
+	s.ServerHandler.Close()
 }
 
 // SendOK to the client.
-func (s *Server) SendOK() {
-	NewResponse(OkResponse, struct{}{})
+func NewOKResponse() Response {
+	return NewResponse(OkResponse, struct{}{})
 }
 
 // SendDone to the client.
-func (s *Server) SendDone() {
-	NewResponse(DoneResponse, struct{}{})
+func NewDoneResponse() Response {
+	return NewResponse(DoneResponse, struct{}{})
 }
