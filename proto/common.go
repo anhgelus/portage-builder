@@ -3,8 +3,10 @@ package proto
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"unicode/utf8"
 )
 
@@ -33,14 +35,19 @@ const (
 	ErrorResponse ResponseCommand = "ERROR"
 )
 
+const MaxResponseLength uint32 = 1024 * 1024
+
 // prepareCommand a command.
 func prepareCommand(cmd string, args any) ([]byte, error) {
 	b, err := MarshalArgs(args)
 	if err != nil {
 		return nil, err
 	}
+	// +3 -> " " and "\r\n"
+	ln := uint32(len(b) + len(cmd) + 3)
 	var buf bytes.Buffer
-	buf.Grow(len(b) + len(cmd) + 3)
+	buf.Write(binary.BigEndian.AppendUint32(nil, ln))
+	buf.Grow(int(ln + 4))
 	buf.WriteString(cmd)
 	buf.WriteRune(' ')
 	buf.Write(b)
@@ -87,13 +94,34 @@ func (e ErrInvalidCommand) Unwrap() error {
 
 // Errors coming from [ParseCommand].
 var (
-	ErrNotUtf8     = errors.New("not utf8 encoded")
-	ErrMissingCRLF = errors.New("missing CRLF")
+	ErrNotUtf8          = errors.New("not utf8 encoded")
+	ErrMissingCRLF      = errors.New("missing CRLF")
+	ErrCannotReadHeader = errors.New("cannot read header")
+	ErrRequestTooLong   = errors.New("request is too long to be processed by the server")
 )
 
 // ParseCommand from raw bytes.
 // Return [ErrInvalidCommand] if the given bytes are invalid.
-func ParseCommand(b []byte) (command Command, err error) {
+func ParseCommand(r io.Reader, maxSize uint32) (command Command, err error) {
+	// extract header containing the length of the command
+	header := make([]byte, 4)
+	var extracted int
+	extracted, err = r.Read(header)
+	if err != nil || extracted != 4 {
+		err = fmt.Errorf("%w: %w", ErrCannotReadHeader, err)
+		return
+	}
+	ln := binary.BigEndian.Uint32(header)
+	if ln >= maxSize {
+		err = ErrRequestTooLong
+		return
+	}
+	b := make([]byte, ln)
+	_, err = io.ReadFull(r, b)
+	if err != nil {
+		return
+	}
+	// parse the real command
 	nb := bytes.TrimSuffix(b, []byte("\r\n"))
 	if len(nb) == len(b) {
 		err = ErrInvalidCommand{b, ErrMissingCRLF}
@@ -137,7 +165,7 @@ type PartArg struct {
 
 type HoyArg struct {
 	Version        uint8
-	MaxRequestSize uint
+	MaxRequestSize uint32
 }
 
 type ErrorArg struct {
@@ -148,6 +176,6 @@ type ErrorArg struct {
 // Can be used concurrently.
 type Communication interface {
 	Write(context.Context, []byte) error
-	Read(context.Context) ([]byte, error)
+	Read(context.Context) (io.Reader, error)
 	Close() error
 }

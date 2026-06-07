@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha3"
+	"io"
 	"strings"
 	"testing"
 
@@ -15,41 +16,51 @@ func TestParseCommand(t *testing.T) {
 		cmd := rapid.StringN(1, -1, -1).Draw(t, "cmd")
 		cmd = strings.ReplaceAll(cmd, " ", "-")
 		args := rapid.SliceOf(rapid.Byte()).Draw(t, "args")
-		args = append(args, '\r', '\n')
-		comd, err := ParseCommand(append([]byte(cmd+" "), args...))
+		b, err := prepareCommand(cmd, struct{ V []byte }{args})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("% x", b)
+		comd, err := ParseCommand(
+			bytes.NewBuffer(b),
+			1024*1024*1024)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if comd.Cmd != cmd {
 			t.Error("invalid cmd:", comd.Cmd)
 		}
-		args = args[:len(args)-2]
 		if len(comd.Args) == 0 && len(args) == 0 {
 			return
 		}
-		if !bytes.Equal(comd.Args, args) {
-			t.Errorf("invalid args: %#v, wanted %#v", comd.Args, args)
+		var got struct{ V []byte }
+		err = UnmarshalArgs(comd.Args, &got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got.V, args) {
+			t.Errorf("invalid args: %#v, wanted %#v", got.V, args)
 		}
 	})
 }
 
 type dummyCom struct {
-	in  chan []byte
-	out chan []byte
+	in  chan io.Reader
+	out chan io.Reader
 }
 
 func newDummyCom() *dummyCom {
-	in := make(chan []byte, 1)
-	out := make(chan []byte, 1)
+	in := make(chan io.Reader, 1)
+	out := make(chan io.Reader, 1)
 	return &dummyCom{in, out}
 }
 
 func (d *dummyCom) Write(_ context.Context, b []byte) error {
-	d.out <- b
+	d.out <- bytes.NewBuffer(b)
 	return nil
 }
 
-func (d *dummyCom) Read(context.Context) ([]byte, error) {
+func (d *dummyCom) Read(context.Context) (io.Reader, error) {
 	return <-d.in, nil
 }
 

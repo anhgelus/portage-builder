@@ -1,6 +1,7 @@
 package proto
 
 import (
+	"bytes"
 	"context"
 	"reflect"
 	"testing"
@@ -36,15 +37,15 @@ func (s *dummyServer) HandlePartRequest(_ context.Context, _ Communication, arg 
 
 func TestServer_Handle(t *testing.T) {
 	com := newDummyCom()
-	s := NewServer(com, &dummyServer{}, 1024*1024*1024)
+	s := NewServer(com, &dummyServer{}, 1024*1024)
 	defer s.Close()
 	rapid.Check(t, func(t *rapid.T) {
 		req := genRequest().Draw(t, "req")
-		err := s.Handle(t.Context(), req.body)
+		err := s.Handle(t.Context(), bytes.NewBuffer(req.body))
 		if err != nil {
 			t.Fatal(err)
 		}
-		resp, err := ParseCommand(<-com.out)
+		resp, err := ParseCommand(<-com.out, s.MaxRequestSize*1024)
 		if resp.Cmd == string(ErrorResponse) {
 			t.Fatal(resp.Args)
 		}

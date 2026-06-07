@@ -2,7 +2,7 @@ package proto
 
 import (
 	"context"
-	"errors"
+	"io"
 )
 
 // Response is a command sent from the server to the client.
@@ -47,12 +47,12 @@ type ServerHandler interface {
 type Server struct {
 	Communication
 	ServerHandler
-	// MaxRequestSize in bytes
-	MaxRequestSize uint
+	// MaxRequestSize in bytes.
+	MaxRequestSize uint32
 }
 
 // NewServer creates a [Server].
-func NewServer(com Communication, handler ServerHandler, maxRequestSize uint) *Server {
+func NewServer(com Communication, handler ServerHandler, maxRequestSize uint32) *Server {
 	return &Server{com, handler, maxRequestSize}
 }
 
@@ -66,12 +66,8 @@ func handle[T any](ctx context.Context, s *Server, cmd Command, fn func(context.
 }
 
 // Handle and dispatch incoming [Request] to the [ServerHandler].
-func (s *Server) Handle(ctx context.Context, b []byte) error {
-	if len(b) >= int(s.MaxRequestSize) {
-		return NewErrorResponse("too long", errors.New("request exceed server's MaxReqSize")).
-			Send(ctx, s)
-	}
-	cmd, err := ParseCommand(b)
+func (s *Server) Handle(ctx context.Context, r io.Reader) error {
+	cmd, err := ParseCommand(r, uint32(s.MaxRequestSize))
 	if err != nil {
 		return NewErrorResponse("invalid command", err).Send(ctx, s)
 	}

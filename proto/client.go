@@ -67,7 +67,7 @@ func (r Request) Send(ctx context.Context, com Communication) (Command, error) {
 	if err != nil {
 		return Command{}, err
 	}
-	cmd, err := ParseCommand(resp)
+	cmd, err := ParseCommand(resp, MaxResponseLength)
 	if err != nil {
 		return cmd, err
 	}
@@ -85,7 +85,7 @@ func (r Request) Send(ctx context.Context, com Communication) (Command, error) {
 type Client struct {
 	Communication
 	Version        uint8
-	MaxRequestSize uint
+	MaxRequestSize uint32
 }
 
 // ErrInvalidResponse is returned when a response doesn't follow the protocol.

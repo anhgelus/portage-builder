@@ -5,11 +5,14 @@ package_part = 1*(ASCII / "-")
 package = package_part "/" package_part 
 
 ; commands
+    ; 1. size of the request
+    ; 2. request itself
+request = 4OCTET (hey_request / build_request / cfg_request / send_request / part_request)
     ; init a handshake
     ; 1. version number
 hey_request = "HEY " CBOR_UINT8 CRLF
     ; request to build packages
-    ; 1.. packages to build
+    ; 1. packages to build
 build_request = "BUILD " package *(" " package) CRLF 
     ; update the configuration
     ; 1. number of files to send
@@ -26,6 +29,9 @@ send_request = "SEND " CBOR_STRING CBOR_UINT CBOR_BYTES CRLF
 part_request = "PART " CBOR_UINT CBOR_BYTES CRLF
 
 ; responses
+    ; 1. size of the response
+    ; 2. request itself
+response = 4OCTET (hoy_response / ok_response / done_response / error_response)
     ; finish handshake
     ; 1. version number
     ; 2. max part size
