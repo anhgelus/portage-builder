@@ -13,7 +13,7 @@ func TestClient(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		dualCom := dummyDualCom{newDummyCom(), newDummyCom()}
 		defer dualCom.Close()
-		s.Communication = dualCom.server
+		s.ReadWriteCloser = dualCom.server
 		errc := setupAutoServer(s, &dualCom)
 		cl, err := NewClient(context.Background(), dualCom.client)
 		if err != nil {

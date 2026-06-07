@@ -181,11 +181,3 @@ type HoyArg struct {
 type ErrorArg struct {
 	Error string
 }
-
-// Communication handles writing and reading data.
-// Can be used concurrently.
-type Communication interface {
-	Write(context.Context, []byte) error
-	Read(context.Context) (io.Reader, error)
-	Close() error
-}

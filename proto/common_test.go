@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha3"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -34,8 +35,7 @@ func TestParseCommand(t *testing.T) {
 		if len(comd.Args) == 0 && len(args) == 0 {
 			return
 		}
-		var got struct{ V []byte }
-		err = UnmarshalArgs(comd.Args, &got)
+		got, err := UnmarshalArgsFor[struct{ V []byte }](comd.Args)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,13 +56,21 @@ func newDummyCom() *dummyCom {
 	return &dummyCom{in, out}
 }
 
-func (d *dummyCom) Write(_ context.Context, b []byte) error {
+func (d *dummyCom) Write(b []byte) (int, error) {
 	d.out <- bytes.NewBuffer(b)
-	return nil
+	return len(b), nil
 }
 
-func (d *dummyCom) Read(context.Context) (io.Reader, error) {
-	return <-d.in, nil
+func (d *dummyCom) Read(b []byte) (int, error) {
+	v := <-d.in
+	n, err := v.Read(b)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return n, err
+	}
+	if n >= len(b) {
+		d.in <- v
+	}
+	return n, nil
 }
 
 func (d *dummyCom) Close() error {

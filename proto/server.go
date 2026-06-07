@@ -28,37 +28,51 @@ func NewErrorResponse(why string, err error) Response {
 }
 
 // Send the [Response].
-func (r Response) Send(ctx context.Context, com Communication) error {
+func (r Response) Send(ctx context.Context, com io.ReadWriteCloser) error {
 	b, err := prepareCommand(string(r.Cmd), r.Args)
 	if err != nil {
 		return err
 	}
-	return com.Write(ctx, b)
+	errc := make(chan error, 1)
+	go func() {
+		_, err := com.Write(b)
+		errc <- err
+	}()
+	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	case err := <-errc:
+		return err
+	}
 }
 
 // ServerHandler handles [Request].
 type ServerHandler interface {
-	HandleBuildRequest(context.Context, Communication, BuildArg) Response
-	HandleConfigRequest(context.Context, Communication, CfgArg) Response
-	HandleSendRequest(context.Context, Communication, SendArg) Response
-	HandlePartRequest(context.Context, Communication, PartArg) Response
+	HandleBuildRequest(context.Context, io.ReadWriteCloser, BuildArg) Response
+	HandleConfigRequest(context.Context, io.ReadWriteCloser, CfgArg) Response
+	HandleSendRequest(context.Context, io.ReadWriteCloser, SendArg) Response
+	HandlePartRequest(context.Context, io.ReadWriteCloser, PartArg) Response
 }
 
 type Server struct {
-	Communication
+	io.ReadWriteCloser
 	ServerHandler
 	// MaxRequestSize in bytes.
 	MaxRequestSize uint32
 }
 
 // NewServer creates a [Server].
-func NewServer(com Communication, handler ServerHandler, maxRequestSize uint32) *Server {
+func NewServer(com io.ReadWriteCloser, handler ServerHandler, maxRequestSize uint32) *Server {
 	return &Server{com, handler, maxRequestSize}
 }
 
-func handle[T any](ctx context.Context, s *Server, cmd Command, fn func(context.Context, Communication, T) Response) Response {
-	var arg T
-	err := UnmarshalArgs(cmd.Args, &arg)
+func handle[T any](
+	ctx context.Context,
+	s *Server,
+	cmd Command,
+	fn func(context.Context, io.ReadWriteCloser, T) Response,
+) Response {
+	arg, err := UnmarshalArgsFor[T](cmd.Args)
 	if err != nil {
 		return NewErrorResponse("invalid command", err)
 	}
@@ -74,8 +88,7 @@ func (s *Server) Handle(ctx context.Context, r io.Reader) error {
 	var resp Response
 	switch RequestCommand(cmd.Cmd) {
 	case HeyRequest:
-		var arg HeyArg
-		err := UnmarshalArgs(cmd.Args, &arg)
+		arg, err := UnmarshalArgsFor[HeyArg](cmd.Args)
 		if err != nil {
 			resp = NewErrorResponse("invalid command", err)
 		} else if Version != arg.Version {

@@ -3,6 +3,7 @@ package proto
 import (
 	"bytes"
 	"context"
+	"io"
 	"reflect"
 	"testing"
 
@@ -15,22 +16,22 @@ type dummyServer struct {
 
 var dummyOk = Response{Cmd: OkResponse, Args: struct{}{}}
 
-func (s *dummyServer) HandleBuildRequest(_ context.Context, _ Communication, arg BuildArg) Response {
+func (s *dummyServer) HandleBuildRequest(_ context.Context, _ io.ReadWriteCloser, arg BuildArg) Response {
 	s.res = arg
 	return dummyOk
 }
 
-func (s *dummyServer) HandleConfigRequest(_ context.Context, _ Communication, arg CfgArg) Response {
+func (s *dummyServer) HandleConfigRequest(_ context.Context, _ io.ReadWriteCloser, arg CfgArg) Response {
 	s.res = arg
 	return dummyOk
 }
 
-func (s *dummyServer) HandleSendRequest(_ context.Context, _ Communication, arg SendArg) Response {
+func (s *dummyServer) HandleSendRequest(_ context.Context, _ io.ReadWriteCloser, arg SendArg) Response {
 	s.res = arg
 	return dummyOk
 }
 
-func (s *dummyServer) HandlePartRequest(_ context.Context, _ Communication, arg PartArg) Response {
+func (s *dummyServer) HandlePartRequest(_ context.Context, _ io.ReadWriteCloser, arg PartArg) Response {
 	s.res = arg
 	return dummyOk
 }

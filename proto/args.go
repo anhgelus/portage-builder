@@ -37,6 +37,11 @@ func (p *Package) UnmarshalCBOR(b []byte) ([]byte, error) {
 	return rest, nil
 }
 
+func UnmarshalArgsFor[T any](b []byte) (T, error) {
+	var arg T
+	return arg, UnmarshalArgs(b, &arg)
+}
+
 func UnmarshalArgs(b []byte, v any) error {
 	val := reflect.ValueOf(v)
 	if val.Kind() != reflect.Pointer || val.IsNil() {

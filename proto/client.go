@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 )
 
 // Request is a command sent to the server.
@@ -53,27 +54,22 @@ func (e ErrResponse) Unwrap() error {
 	return e.Details
 }
 
-// Send the [Request].
-func (r Request) Send(ctx context.Context, com Communication) (Command, error) {
+// Send the [Request] and returns the response as a [Command].
+func (r Request) Send(ctx context.Context, com io.ReadWriteCloser) (Command, error) {
 	b, err := prepareCommand(string(r.Cmd), r.Args)
 	if err != nil {
 		return Command{}, err
 	}
-	err = com.Write(ctx, b)
+	_, err = com.Write(b)
 	if err != nil {
 		return Command{}, err
 	}
-	resp, err := com.Read(ctx)
-	if err != nil {
-		return Command{}, err
-	}
-	cmd, err := ParseCommand(ctx, resp, MaxResponseLength)
+	cmd, err := ParseCommand(ctx, com, MaxResponseLength)
 	if err != nil {
 		return cmd, err
 	}
 	if cmd.Cmd == string(ErrorResponse) {
-		var arg ErrorArg
-		err = UnmarshalArgs(cmd.Args, &arg)
+		arg, err := UnmarshalArgsFor[ErrorArg](cmd.Args)
 		if err != nil {
 			return Command{}, err
 		}
@@ -83,7 +79,7 @@ func (r Request) Send(ctx context.Context, com Communication) (Command, error) {
 }
 
 type Client struct {
-	Communication
+	io.ReadWriteCloser
 	Version        uint8
 	MaxRequestSize uint32
 }
@@ -126,8 +122,8 @@ func NewInvalidResponseCommand(cmd *Command, exp ResponseCommand) ErrInvalidResp
 }
 
 // NewClient creates a new [Client].
-func NewClient(ctx context.Context, com Communication) (*Client, error) {
-	c := &Client{Communication: com}
+func NewClient(ctx context.Context, com io.ReadWriteCloser) (*Client, error) {
+	c := &Client{ReadWriteCloser: com}
 	cmd, err := NewRequest(HeyRequest, HeyArg{Version}).Send(ctx, com)
 	if err != nil {
 		return nil, err
@@ -135,8 +131,7 @@ func NewClient(ctx context.Context, com Communication) (*Client, error) {
 	if cmd.Cmd != string(HoyResponse) {
 		return nil, NewInvalidResponseCommand(&cmd, HoyResponse)
 	}
-	var arg HoyArg
-	err = UnmarshalArgs(cmd.Args, &arg)
+	arg, err := UnmarshalArgsFor[HoyArg](cmd.Args)
 	if err != nil {
 		return nil, err
 	}
