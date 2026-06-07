@@ -12,7 +12,7 @@ import (
 type Config struct {
 	Port uint `toml:"port"`
 	// MaxRequestSize in Kio.
-	MaxRequestSize uint             `toml:"max_request_size"`
+	MaxRequestSize uint32           `toml:"max_request_size"`
 	Keys           Keys             `toml:"server_keys"`
 	Users          map[string]*User `toml:"users"`
 }
@@ -80,7 +80,7 @@ var requiredKeys = [][]string{{"server_keys", "private_key_file"}}
 
 const (
 	defaultPort           uint        = 2020
-	defaultMaxRequestSize uint        = 1024
+	defaultMaxRequestSize uint32      = 1024
 	defaultKeysPerms      os.FileMode = 0o600
 )
 

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"anhgelus.world/portage-builder/common"
+	"anhgelus.world/portage-builder/server/requests"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -100,6 +101,11 @@ func (s *SSH) ListenAndServe(ctx context.Context) error {
 		}
 	}()
 	<-ctx.Done()
+	err = l.Close()
+	if err != nil {
+		log.Error("disconnecting", "error", err)
+	}
+	log.Info("disconnected")
 	return context.Cause(ctx)
 }
 
@@ -116,9 +122,17 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 	go ssh.DiscardRequests(reqs)
 	for newChannel := range chans {
 		log = log.With("channel", newChannel.ChannelType())
+		var ch ssh.Channel
+		var reqs <-chan *ssh.Request
 		switch newChannel.ChannelType() {
-		case common.PkgChannel:
-		case common.RequestChannel:
+		case "session":
+			ch, reqs, err = newChannel.Accept()
+			if err == nil {
+				go requests.HandleChannel(
+					common.NewLoggerContext(ctx, log),
+					ch, reqs,
+					s.serverConfig.MaxRequestSize)
+			}
 		default:
 			err = newChannel.Reject(ssh.UnknownChannelType, "only support pkg and request")
 		}

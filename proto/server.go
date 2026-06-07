@@ -67,7 +67,7 @@ func handle[T any](ctx context.Context, s *Server, cmd Command, fn func(context.
 
 // Handle and dispatch incoming [Request] to the [ServerHandler].
 func (s *Server) Handle(ctx context.Context, r io.Reader) error {
-	cmd, err := ParseCommand(r, uint32(s.MaxRequestSize))
+	cmd, err := ParseCommand(ctx, r, s.MaxRequestSize)
 	if err != nil {
 		return NewErrorResponse("invalid command", err).Send(ctx, s)
 	}

@@ -1,6 +1,5 @@
 package common
 
 const (
-	PkgChannel     = "pkg"
-	RequestChannel = "request"
+	CommandRequest = "request"
 )

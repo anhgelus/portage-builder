@@ -67,7 +67,7 @@ func (r Request) Send(ctx context.Context, com Communication) (Command, error) {
 	if err != nil {
 		return Command{}, err
 	}
-	cmd, err := ParseCommand(resp, MaxResponseLength)
+	cmd, err := ParseCommand(ctx, resp, MaxResponseLength)
 	if err != nil {
 		return cmd, err
 	}

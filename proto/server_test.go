@@ -45,7 +45,7 @@ func TestServer_Handle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		resp, err := ParseCommand(<-com.out, s.MaxRequestSize*1024)
+		resp, err := ParseCommand(t.Context(), <-com.out, s.MaxRequestSize)
 		if resp.Cmd == string(ErrorResponse) {
 			t.Fatal(resp.Args)
 		}

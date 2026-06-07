@@ -22,6 +22,7 @@ func TestParseCommand(t *testing.T) {
 		}
 		t.Logf("% x", b)
 		comd, err := ParseCommand(
+			t.Context(),
 			bytes.NewBuffer(b),
 			1024*1024*1024)
 		if err != nil {

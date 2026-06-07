@@ -102,38 +102,48 @@ var (
 
 // ParseCommand from raw bytes.
 // Return [ErrInvalidCommand] if the given bytes are invalid.
-func ParseCommand(r io.Reader, maxSize uint32) (command Command, err error) {
-	// extract header containing the length of the command
-	header := make([]byte, 4)
-	var extracted int
-	extracted, err = r.Read(header)
-	if err != nil || extracted != 4 {
-		err = fmt.Errorf("%w: %w", ErrCannotReadHeader, err)
-		return
+func ParseCommand(ctx context.Context, r io.Reader, maxSize uint32) (command Command, err error) {
+	done := make(chan struct{}, 1)
+	go func() {
+		defer func() {
+			done <- struct{}{}
+		}()
+		// extract header containing the length of the command
+		header := make([]byte, 4)
+		_, err = io.ReadFull(r, header)
+		if err != nil {
+			err = fmt.Errorf("%w: %w", ErrCannotReadHeader, err)
+			return
+		}
+		ln := binary.BigEndian.Uint32(header)
+		if ln >= maxSize {
+			err = ErrRequestTooLong
+			return
+		}
+		b := make([]byte, ln)
+		_, err = io.ReadFull(r, b)
+		if err != nil {
+			return
+		}
+		// parse the real command
+		nb := bytes.TrimSuffix(b, []byte("\r\n"))
+		if len(nb) == len(b) {
+			err = ErrInvalidCommand{b, ErrMissingCRLF}
+			return
+		}
+		cmd, args, _ := bytes.Cut(nb, []byte(" "))
+		if !utf8.Valid(cmd) {
+			err = ErrInvalidCommand{b, ErrNotUtf8}
+			return
+		}
+		command.Cmd = string(cmd)
+		command.Args = args
+	}()
+	select {
+	case <-ctx.Done():
+		err = context.Cause(ctx)
+	case <-done:
 	}
-	ln := binary.BigEndian.Uint32(header)
-	if ln >= maxSize {
-		err = ErrRequestTooLong
-		return
-	}
-	b := make([]byte, ln)
-	_, err = io.ReadFull(r, b)
-	if err != nil {
-		return
-	}
-	// parse the real command
-	nb := bytes.TrimSuffix(b, []byte("\r\n"))
-	if len(nb) == len(b) {
-		err = ErrInvalidCommand{b, ErrMissingCRLF}
-		return
-	}
-	cmd, args, _ := bytes.Cut(nb, []byte(" "))
-	if !utf8.Valid(cmd) {
-		err = ErrInvalidCommand{b, ErrNotUtf8}
-		return
-	}
-	command.Cmd = string(cmd)
-	command.Args = args
 	return
 }
 
