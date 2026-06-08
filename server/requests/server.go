@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"sync"
 
 	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/proto"
+	"anhgelus.world/portage-builder/server/files"
 )
 
 type state struct {
@@ -82,9 +84,10 @@ type File struct {
 }
 
 type UserHandler struct {
-	mu    sync.Mutex
-	state state
-	User  string
+	mu     sync.Mutex
+	state  state
+	User   string
+	chroot *files.Root
 	// build requests
 	builds chan []*proto.Package
 	// config, send and part requests
@@ -94,9 +97,10 @@ type UserHandler struct {
 	currentPath     string
 }
 
-func NewUserHandler(user string) *UserHandler {
+func NewUserHandler(user string, chroot *files.Root) *UserHandler {
 	return &UserHandler{
 		User:         user,
+		chroot:       chroot,
 		builds:       make(chan []*proto.Package, 1),
 		updatedFiles: make(chan File, 1),
 	}
@@ -139,6 +143,15 @@ func (h *UserHandler) HandleSendRequest(ctx context.Context, arg proto.SendArg) 
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	sum, err := h.chroot.ChecksumOf(arg.Path)
+	if err != nil && !os.IsNotExist(err) {
+		return proto.NewErrorResponse("cannot compare checksum", err)
+	} else if sum == arg.Checksum {
+		// skip
+		h.state.DoSend(0)
+		h.state.DoPart()
+		return proto.NewDoneResponse()
+	}
 	h.state.DoSend(arg.Parts)
 	// prepare uploading
 	h.currentPath = arg.Path

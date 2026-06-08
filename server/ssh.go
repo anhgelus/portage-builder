@@ -12,6 +12,7 @@ import (
 
 	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/proto"
+	"anhgelus.world/portage-builder/server/files"
 	"anhgelus.world/portage-builder/server/requests"
 	"golang.org/x/crypto/ssh"
 )
@@ -121,12 +122,29 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 		return
 	}
 	defer conn.Close()
-	log = log.With("user", conn.User())
+	user := conn.User()
+	log = log.With("user", user)
+	// setup chroot
+	setupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	chroot, err := files.LoadRoot("", user)
+	if err != nil {
+		log.Error("loading chroot", "error", err)
+		return
+	}
+	defer chroot.Close(setupCtx)
+	err = chroot.Mount(setupCtx)
+	if err != nil {
+		log.Error("mounting in chroot", "error", err)
+		return
+	}
+	// setup server
 	srv := proto.NewServer(
-		requests.NewUserHandler(conn.User()),
+		requests.NewUserHandler(user, chroot),
 		s.serverConfig.MaxRequestSize)
 	defer srv.Close()
 	go ssh.DiscardRequests(reqs)
+	// setup listeners
 	for newChannel := range chans {
 		log = log.With("channel", newChannel.ChannelType())
 		var ch ssh.Channel
@@ -138,7 +156,7 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 				go requests.HandleChannel(common.NewLoggerContext(ctx, log), srv, ch, reqs)
 			}
 		default:
-			err = newChannel.Reject(ssh.UnknownChannelType, "only support pkg and request")
+			err = newChannel.Reject(ssh.UnknownChannelType, "only support session")
 		}
 		if err != nil {
 			log.Error("handling channel", "error", err)
