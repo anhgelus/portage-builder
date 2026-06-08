@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 type SSH struct {
 	serverConfig *Config
 	sshConfig    *ssh.ServerConfig
+	rootManager  *files.Manager
 }
 
 // New creates a [SSH] server.
@@ -79,6 +81,7 @@ func New(log *slog.Logger, config *Config) (*SSH, error) {
 	return &SSH{
 		serverConfig: config,
 		sshConfig:    cfg,
+		rootManager:  files.NewManager(path.Join(config.DataFolder, config.UsersFolder)),
 	}, nil
 }
 
@@ -88,6 +91,13 @@ func (s *SSH) ListenAndServe(ctx context.Context) error {
 		return err
 	}
 	defer l.Close()
+	defer func() {
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second)
+		defer cancel()
+		_ = s.rootManager.Close(ctx)
+	}()
 	log := common.ContextLogger(ctx)
 	//errc := make(chan error, 1)
 	go func() {
@@ -127,24 +137,21 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 	// setup chroot
 	setupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	chroot, err := files.LoadRoot("", user)
+	chroot, err := s.rootManager.GetUser(setupCtx, user)
 	if err != nil {
 		log.Error("loading chroot", "error", err)
 		return
 	}
-	defer chroot.Close(setupCtx)
-	err = chroot.Mount(setupCtx)
-	if err != nil {
-		log.Error("mounting in chroot", "error", err)
-		return
-	}
 	// setup server
+	handler := requests.NewUserHandler(user, chroot)
 	srv := proto.NewServer(
-		requests.NewUserHandler(user, chroot),
+		handler,
 		s.serverConfig.MaxRequestSize)
 	defer srv.Close()
-	go ssh.DiscardRequests(reqs)
 	// setup listeners
+	go handleBuilds(log, chroot, handler)
+	go handleFiles(log, chroot, handler)
+	go ssh.DiscardRequests(reqs)
 	for newChannel := range chans {
 		log = log.With("channel", newChannel.ChannelType())
 		var ch ssh.Channel
@@ -160,6 +167,24 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 		}
 		if err != nil {
 			log.Error("handling channel", "error", err)
+		}
+	}
+}
+
+func handleBuilds(log *slog.Logger, chroot *files.Root, handler *requests.UserHandler) {
+	for pkgs := range handler.UpdatedBuilds() {
+		err := chroot.AppendPackage(pkgs...)
+		if err != nil {
+			log.Error("appending packages", "error", err, "pkgs", pkgs)
+		}
+	}
+}
+
+func handleFiles(log *slog.Logger, chroot *files.Root, handler *requests.UserHandler) {
+	for f := range handler.UploadedFiles() {
+		err := chroot.WriteFile(f.Path, f.Content, 0o644)
+		if err != nil {
+			log.Error("writing file", "error", err, "file", f)
 		}
 	}
 }

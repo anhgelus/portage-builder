@@ -10,8 +10,9 @@ import (
 
 // Config of the server.
 type Config struct {
-	Port       uint   `toml:"port"`
-	DataFolder string `toml:"data_folder"`
+	Port        uint   `toml:"port"`
+	DataFolder  string `toml:"data_folder"`
+	UsersFolder string `toml:"users_folder"`
 	// MaxRequestSize in Kio.
 	MaxRequestSize uint32           `toml:"max_request_size"`
 	Keys           Keys             `toml:"server_keys"`
@@ -83,6 +84,7 @@ const (
 	defaultPort           uint        = 2020
 	defaultMaxRequestSize uint32      = 1024
 	defaultDataFolder                 = "/var/lib/portage-builder/"
+	defaultUsersFolder                = "user"
 	defaultKeysPerms      os.FileMode = 0o600
 )
 
@@ -95,6 +97,7 @@ func LoadConfig(path string) (Config, error) {
 	cfg := Config{
 		Port:           defaultPort,
 		DataFolder:     defaultDataFolder,
+		UsersFolder:    defaultUsersFolder,
 		MaxRequestSize: defaultMaxRequestSize,
 		Keys:           Keys{Perms: defaultKeysPerms},
 	}
