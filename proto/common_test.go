@@ -90,7 +90,7 @@ func setupAutoServer(s *Server, com *dummyDualCom) <-chan error {
 	// connect client out to server in
 	go func() {
 		for b := range com.client.out {
-			err := s.Handle(context.Background(), b)
+			err := s.Handle(context.Background(), com.server, b)
 			if err != nil {
 				errc <- err
 			}

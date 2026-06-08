@@ -68,7 +68,6 @@ func NewServer(handler ServerHandler, maxRequestSize uint32) *Server {
 
 func handle[T any](
 	ctx context.Context,
-	s *Server,
 	cmd Command,
 	fn func(context.Context, T) Response,
 ) Response {
@@ -97,13 +96,13 @@ func (s *Server) Handle(ctx context.Context, com io.ReadWriteCloser, r io.Reader
 			resp = NewResponse(HoyResponse, HoyArg{arg.Version, s.MaxRequestSize})
 		}
 	case BuildRequest:
-		resp = handle(ctx, s, cmd, s.HandleBuildRequest)
+		resp = handle(ctx, cmd, s.HandleBuildRequest)
 	case CfgRequest:
-		resp = handle(ctx, s, cmd, s.HandleConfigRequest)
+		resp = handle(ctx, cmd, s.HandleConfigRequest)
 	case SendRequest:
-		resp = handle(ctx, s, cmd, s.HandleSendRequest)
+		resp = handle(ctx, cmd, s.HandleSendRequest)
 	case PartRequest:
-		resp = handle(ctx, s, cmd, s.HandlePartRequest)
+		resp = handle(ctx, cmd, s.HandlePartRequest)
 	default:
 		resp = NewResponse(ErrorResponse, []byte("unknown command"))
 	}
