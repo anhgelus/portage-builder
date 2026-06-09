@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -16,12 +17,13 @@ import (
 type Root struct {
 	*os.Root
 	User string
+	info *common.RingBuffer
 }
 
 // LoadRoot for the specified user.
 func LoadRoot(userFolder, user string) (*Root, error) {
 	root, err := os.OpenRoot(path.Join(userFolder, user))
-	return &Root{root, user}, err
+	return &Root{root, user, common.NewRingBuffer(512)}, err
 }
 
 // CreateRoot initializes the [Root] for the given user.
@@ -66,7 +68,7 @@ func (r *Root) Path(inside string) (absolute string) {
 }
 
 func (r *Root) Close(ctx context.Context) error {
-	var errs []error
+	errs := make([]error, 0, 4)
 	mnt := exec.CommandContext(ctx, "umount", r.Path("proc"))
 	errs = append(errs, mnt.Run())
 	mnt = exec.CommandContext(ctx, "umount", r.Path("dev"))
@@ -126,13 +128,13 @@ func (r *Root) Update(ctx context.Context) error {
 
 // CommandContext returns a [exec.Cmd] that runs inside the [Root].
 func (r *Root) CommandContext(ctx context.Context, name string, args ...string) *exec.Cmd {
-	arg := make([]string, 2+len(args))
-	arg[0] = r.Name()
-	arg[1] = name
-	for i, a := range args {
-		arg[i+2] = a
-	}
-	return exec.CommandContext(ctx, "chroot", arg...)
+	arg := make([]string, 0, 2+len(args))
+	arg = append(arg, r.Name(), name)
+	arg = append(arg, args...)
+	cmd := exec.CommandContext(ctx, "chroot", arg...)
+	cmd.Stderr = r.info
+	cmd.Stdout = r.info
+	return cmd
 }
 
 // ChecksumOf a file in the [Root].
@@ -158,4 +160,8 @@ func (r *Root) AppendPackage(pkgs ...*proto.Package) error {
 	}
 	_, err = f.Write(buf.Bytes())
 	return err
+}
+
+func (r *Root) Info() io.Reader {
+	return r.info
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type Manager struct {
-	mu     sync.RWMutex
+	mu     sync.Mutex
 	data   map[string]*Root
 	folder string
 }
@@ -17,16 +17,13 @@ func NewManager(folder string) *Manager {
 }
 
 func (m *Manager) GetUser(ctx context.Context, user string) (*Root, error) {
-	m.mu.RLock()
-	r, ok := m.data[user]
-	if ok {
-		m.mu.RUnlock()
-		return r, nil
-	}
-	m.mu.RUnlock()
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	r, ok := m.data[user]
+	if ok {
+		return r, nil
+	}
+
 	r, err := LoadRoot(m.folder, user)
 	if err != nil {
 		return nil, err
@@ -49,6 +46,8 @@ func (m *Manager) InitUser(ctx context.Context, stage3 string, user string) (*Ro
 }
 
 func (m *Manager) Close(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	var errs []error
 	for _, r := range m.data {
 		err := r.Close(ctx)
@@ -56,6 +55,7 @@ func (m *Manager) Close(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
+	m.data = nil
 	var out error
 	for _, err := range errs {
 		if out != nil {

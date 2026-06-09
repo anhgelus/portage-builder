@@ -168,7 +168,7 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 		case common.InfoChannel:
 			ch, reqs, err = newChannel.Accept()
 			if err == nil {
-				go info.HandleChannel(ctx, srv, ch, reqs)
+				go info.HandleChannel(ctx, chroot, ch, reqs)
 			}
 		default:
 			log.Debug("rejected")

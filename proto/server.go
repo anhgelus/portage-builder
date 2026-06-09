@@ -55,7 +55,6 @@ type ServerHandler interface {
 	HandleConfigRequest(context.Context, CfgArg) Response
 	HandleSendRequest(context.Context, SendArg) Response
 	HandlePartRequest(context.Context, PartArg) Response
-	Info() io.Reader
 }
 
 type Server struct {
