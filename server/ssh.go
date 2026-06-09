@@ -14,6 +14,7 @@ import (
 	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/proto"
 	"anhgelus.world/portage-builder/server/files"
+	"anhgelus.world/portage-builder/server/info"
 	"anhgelus.world/portage-builder/server/requests"
 	"golang.org/x/crypto/ssh"
 )
@@ -149,21 +150,31 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 		s.serverConfig.MaxRequestSize)
 	defer srv.Close()
 	// setup listeners
-	go handleBuilds(log, chroot, handler)
-	go handleFiles(log, chroot, handler)
+	handleBuilds(log, chroot, handler)
+	handleFiles(log, chroot, handler)
 	go ssh.DiscardRequests(reqs)
 	for newChannel := range chans {
 		log = log.With("channel", newChannel.ChannelType())
+		log.Debug("new channel")
+		ctx = common.NewLoggerContext(ctx, log)
 		var ch ssh.Channel
 		var reqs <-chan *ssh.Request
 		switch newChannel.ChannelType() {
-		case "session":
+		case common.RequestChannel:
 			ch, reqs, err = newChannel.Accept()
 			if err == nil {
-				go requests.HandleChannel(common.NewLoggerContext(ctx, log), srv, ch, reqs)
+				go requests.HandleChannel(ctx, srv, ch, reqs)
+			}
+		case common.InfoChannel:
+			ch, reqs, err = newChannel.Accept()
+			if err == nil {
+				go info.HandleChannel(ctx, srv, ch, reqs)
 			}
 		default:
-			err = newChannel.Reject(ssh.UnknownChannelType, "only support session")
+			log.Debug("rejected")
+			err = newChannel.Reject(
+				ssh.UnknownChannelType,
+				fmt.Sprint("only support", common.RequestChannel, common.InfoChannel))
 		}
 		if err != nil {
 			log.Error("handling channel", "error", err)
@@ -172,7 +183,7 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 }
 
 func handleBuilds(log *slog.Logger, chroot *files.Root, handler *requests.UserHandler) {
-	for pkgs := range handler.UpdatedBuilds() {
+	for pkgs := range handler.PackagesAdded() {
 		err := chroot.AppendPackage(pkgs...)
 		if err != nil {
 			log.Error("appending packages", "error", err, "pkgs", pkgs)

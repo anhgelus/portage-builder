@@ -10,7 +10,6 @@ import (
 
 func HandleChannel(ctx context.Context, srv *proto.Server, ch ssh.Channel, reqs <-chan *ssh.Request) {
 	log := common.ContextLogger(ctx)
-	log.Debug("new channel")
 	go ssh.DiscardRequests(reqs)
 	go func() {
 		for {

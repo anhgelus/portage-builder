@@ -89,7 +89,9 @@ type UserHandler struct {
 	User   string
 	chroot *files.Root
 	// build requests
-	builds chan []*proto.Package
+	addBuilds    chan []*proto.Package
+	removeBuilds chan []*proto.Package
+	update       chan struct{}
 	// config, send and part requests
 	updatedFiles    chan File
 	currentUpload   bytes.Buffer
@@ -101,7 +103,9 @@ func NewUserHandler(user string, chroot *files.Root) *UserHandler {
 	return &UserHandler{
 		User:         user,
 		chroot:       chroot,
-		builds:       make(chan []*proto.Package, 1),
+		addBuilds:    make(chan []*proto.Package, 1),
+		removeBuilds: make(chan []*proto.Package, 1),
+		update:       make(chan struct{}, 1),
 		updatedFiles: make(chan File, 1),
 	}
 }
@@ -114,7 +118,31 @@ func (h *UserHandler) HandleBuildRequest(ctx context.Context, arg proto.BuildArg
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.builds <- arg.Packages
+	h.addBuilds <- arg.Packages
+	return proto.NewOKResponse()
+}
+
+func (h *UserHandler) HandleRemoveRequest(ctx context.Context, arg proto.RemoveArg) proto.Response {
+	if !h.state.CanBuild() {
+		return proto.NewErrorResponse(
+			"invalid request",
+			fmt.Errorf("cannot use remove request in this state"))
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.removeBuilds <- arg.Packages
+	return proto.NewOKResponse()
+}
+
+func (h *UserHandler) HandleUpdateRequest(ctx context.Context, arg proto.UpdateArg) proto.Response {
+	if !h.state.CanBuild() {
+		return proto.NewErrorResponse(
+			"invalid request",
+			fmt.Errorf("cannot use update request in this state"))
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.update <- arg
 	return proto.NewOKResponse()
 }
 
@@ -186,8 +214,16 @@ func (h *UserHandler) HandlePartRequest(ctx context.Context, arg proto.PartArg) 
 	return proto.NewOKResponse()
 }
 
-func (h *UserHandler) UpdatedBuilds() <-chan []*proto.Package {
-	return h.builds
+func (h *UserHandler) PackagesAdded() <-chan []*proto.Package {
+	return h.addBuilds
+}
+
+func (h *UserHandler) PackagesRemoved() <-chan []*proto.Package {
+	return h.removeBuilds
+}
+
+func (h *UserHandler) UpdatePackages() <-chan struct{} {
+	return h.update
 }
 
 func (h *UserHandler) UploadedFiles() <-chan File {
@@ -195,6 +231,8 @@ func (h *UserHandler) UploadedFiles() <-chan File {
 }
 
 func (h *UserHandler) Close() {
-	close(h.builds)
+	close(h.addBuilds)
+	close(h.removeBuilds)
+	close(h.update)
 	close(h.updatedFiles)
 }

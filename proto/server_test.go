@@ -20,6 +20,16 @@ func (s *dummyServer) HandleBuildRequest(_ context.Context, arg BuildArg) Respon
 	return dummyOk
 }
 
+func (s *dummyServer) HandleRemoveRequest(_ context.Context, arg RemoveArg) Response {
+	s.res = arg
+	return dummyOk
+}
+
+func (s *dummyServer) HandleUpdateRequest(_ context.Context, arg UpdateArg) Response {
+	s.res = arg
+	return dummyOk
+}
+
 func (s *dummyServer) HandleConfigRequest(_ context.Context, arg CfgArg) Response {
 	s.res = arg
 	return dummyOk
@@ -35,7 +45,7 @@ func (s *dummyServer) HandlePartRequest(_ context.Context, arg PartArg) Response
 	return dummyOk
 }
 
-func (s *dummyServer) Close()
+func (s *dummyServer) Close() {}
 
 func TestServer_Handle(t *testing.T) {
 	com := newDummyCom()

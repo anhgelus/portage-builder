@@ -17,11 +17,13 @@ type RequestCommand string
 
 // Request commands used
 const (
-	HeyRequest   RequestCommand = "HEY"
-	BuildRequest RequestCommand = "BUILD"
-	CfgRequest   RequestCommand = "CONFIG"
-	SendRequest  RequestCommand = "SEND"
-	PartRequest  RequestCommand = "PART"
+	HeyRequest    RequestCommand = "HEY"
+	BuildRequest  RequestCommand = "PKGBUILD"
+	RemoveRequest RequestCommand = "PKGREMOVE"
+	UpdateRequest RequestCommand = "PKGUPDATE"
+	CfgRequest    RequestCommand = "CONFIG"
+	SendRequest   RequestCommand = "SEND"
+	PartRequest   RequestCommand = "PART"
 )
 
 // ResponseCommand identifies the command sent by the server.
@@ -172,6 +174,12 @@ type PartArg struct {
 	Size    uint
 	Content []byte
 }
+
+type RemoveArg struct {
+	Packages []*Package
+}
+
+type UpdateArg struct{}
 
 type HoyArg struct {
 	Version        uint8

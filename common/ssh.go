@@ -1,5 +1,6 @@
 package common
 
 const (
-	CommandRequest = "request"
+	RequestChannel = "session"
+	InfoChannel    = "info"
 )

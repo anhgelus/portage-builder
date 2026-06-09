@@ -1,6 +1,7 @@
 ; variables CBOR_* represent a value encoded with DAG-CBOR
 
 ; gentoo
+	; encoded as CBOR_STRING
 package_part = 1*(ASCII / "-")
 package = package_part "/" package_part 
 
@@ -13,7 +14,12 @@ request = 4OCTET (hey_request / build_request / cfg_request / send_request / par
 hey_request = "HEY " CBOR_UINT8 CRLF
     ; request to build packages
     ; 1. packages to build
-build_request = "BUILD " package *(" " package) CRLF 
+build_request = "PKGBUILD " package *(" " package) CRLF 
+    ; request to remove packages from world
+    ; 1. packages to remove
+remove_request = "PKGREMOVE " package *(" " package) CRLF 
+    ; request an update of every package
+update_request = "PKGUPDATE " CRLF
     ; update the configuration
     ; 1. number of files to send
 cfg_request = "CONFIG " CBOR_UINT8 CRLF
@@ -37,9 +43,9 @@ response = 4OCTET (hoy_response / ok_response / done_response / error_response)
     ; 2. max part size
 hoy_response = "HOY " CBOR_UINT8 CBOR_UINT CRLF
     ; success
-ok_response = "OK" CRLF
+ok_response = "OK " CRLF
     ; success, can stop now (e.g., do not continue a SEND with PART)
-done_response = "DONE" CRLF
+done_response = "DONE " CRLF
     ; there is an error
     ; 1. reason
 error_response = "ERROR " CBOR_STRING CRLF

@@ -50,9 +50,12 @@ func (r Response) Send(ctx context.Context, com io.ReadWriteCloser) error {
 type ServerHandler interface {
 	Close()
 	HandleBuildRequest(context.Context, BuildArg) Response
+	HandleRemoveRequest(context.Context, RemoveArg) Response
+	HandleUpdateRequest(context.Context, UpdateArg) Response
 	HandleConfigRequest(context.Context, CfgArg) Response
 	HandleSendRequest(context.Context, SendArg) Response
 	HandlePartRequest(context.Context, PartArg) Response
+	Info() io.Reader
 }
 
 type Server struct {
@@ -97,6 +100,10 @@ func (s *Server) Handle(ctx context.Context, com io.ReadWriteCloser, r io.Reader
 		}
 	case BuildRequest:
 		resp = handle(ctx, cmd, s.HandleBuildRequest)
+	case RemoveRequest:
+		resp = handle(ctx, cmd, s.HandleRemoveRequest)
+	case UpdateRequest:
+		resp = handle(ctx, cmd, s.HandleUpdateRequest)
 	case CfgRequest:
 		resp = handle(ctx, cmd, s.HandleConfigRequest)
 	case SendRequest:

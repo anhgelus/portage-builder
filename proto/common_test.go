@@ -133,6 +133,8 @@ func genRequest() *rapid.Generator[request] {
 		cmd := rapid.OneOf(
 			rapid.Just(HeyRequest),
 			rapid.Just(BuildRequest),
+			rapid.Just(UpdateRequest),
+			rapid.Just(RemoveRequest),
 			rapid.Just(CfgRequest),
 			rapid.Just(SendRequest),
 			rapid.Just(PartRequest)).Draw(t, "cmd")
@@ -143,6 +145,11 @@ func genRequest() *rapid.Generator[request] {
 		case BuildRequest:
 			p := rapid.SliceOfN(genPackage(), 1, -1).Draw(t, "packages")
 			args = BuildArg{p}
+		case RemoveRequest:
+			p := rapid.SliceOfN(genPackage(), 1, -1).Draw(t, "packages")
+			args = RemoveArg{p}
+		case UpdateRequest:
+			args = UpdateArg{}
 		case CfgRequest:
 			nbr := rapid.Uint8Min(1).Draw(t, "nbr")
 			args = CfgArg{nbr}
