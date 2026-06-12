@@ -80,6 +80,7 @@ func (e ErrInvalidConfig) Is(err error) bool {
 
 var requiredKeys = [][]string{{"server_keys", "private_key_file"}}
 
+// Default configs
 const (
 	defaultPort           uint        = 2020
 	defaultMaxRequestSize uint32      = 1024

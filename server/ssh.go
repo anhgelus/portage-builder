@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"os"
 	"path"
@@ -25,8 +26,10 @@ type SSH struct {
 	rootManager  *files.Manager
 }
 
-// New creates a [SSH] server.
-func New(log *slog.Logger, config *Config) (*SSH, error) {
+// New creates a [SSH] server and init new users.
+func New(ctx context.Context, config *Config) (*SSH, error) {
+	log := common.ContextLogger(ctx)
+
 	algorithms := ssh.SupportedAlgorithms()
 
 	cfg := &ssh.ServerConfig{
@@ -79,11 +82,21 @@ func New(log *slog.Logger, config *Config) (*SSH, error) {
 		return nil, err
 	}
 	cfg.AddHostKey(signer)
-	return &SSH{
+
+	ssh := &SSH{
 		serverConfig: config,
 		sshConfig:    cfg,
 		rootManager:  files.NewManager(path.Join(config.DataFolder, config.UsersFolder)),
-	}, nil
+	}
+
+	errc := ssh.rootManager.InitUsers(ctx, maps.Keys(config.Users))
+
+	select {
+	case err = <-errc:
+	case <-ctx.Done():
+		err = context.Cause(ctx)
+	}
+	return ssh, err
 }
 
 func (s *SSH) ListenAndServe(ctx context.Context) error {
@@ -150,8 +163,8 @@ func (s *SSH) handle(ctx context.Context, tcp net.Conn) {
 		s.serverConfig.MaxRequestSize)
 	defer srv.Close()
 	// setup listeners
-	handleBuilds(log, chroot, handler)
-	handleFiles(log, chroot, handler)
+	go handleBuilds(log, chroot, handler)
+	go handleFiles(log, chroot, handler)
 	go ssh.DiscardRequests(reqs)
 	for newChannel := range chans {
 		log = log.With("channel", newChannel.ChannelType())
