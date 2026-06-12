@@ -76,7 +76,7 @@ func (m *Manager) Close(ctx context.Context) error {
 	return out
 }
 
-func (m *Manager) InitUsers(ctx context.Context, users iter.Seq[string]) <-chan error {
+func (m *Manager) InitUsers(ctx context.Context, stage3 string, users iter.Seq[string]) <-chan error {
 	errc := make(chan error, 1)
 	var wg sync.WaitGroup
 	for user := range users {
@@ -89,7 +89,7 @@ func (m *Manager) InitUsers(ctx context.Context, users iter.Seq[string]) <-chan 
 			panic(err)
 		}
 		wg.Go(func() {
-			_, err = m.InitUser(ctx, "", user)
+			_, err = m.InitUser(ctx, stage3, user)
 			errc <- err
 		})
 	}

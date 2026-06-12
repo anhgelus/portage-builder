@@ -89,7 +89,7 @@ func New(ctx context.Context, config *Config) (*SSH, error) {
 		rootManager:  files.NewManager(path.Join(config.DataFolder, config.UsersFolder)),
 	}
 
-	errc := ssh.rootManager.InitUsers(ctx, maps.Keys(config.Users))
+	errc := ssh.rootManager.InitUsers(ctx, config.Stage3, maps.Keys(config.Users))
 
 	select {
 	case err = <-errc:

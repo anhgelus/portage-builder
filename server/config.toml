@@ -2,6 +2,7 @@ port = 2020
 max_request_size = 1024  #  in Kio
 data_folder = "/var/lib/portage-builder/"
 users_folder = "users"  #  in the data_folder
+stage3 = "https://distfiles.gentoo.org/releases/amd64/autobuilds/20260610T214636Z/stage3-amd64-openrc-20260610T214636Z.tar.xz"
 
 [server_keys]
 permissions = 0o600

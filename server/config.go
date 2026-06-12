@@ -13,6 +13,7 @@ type Config struct {
 	Port        uint   `toml:"port"`
 	DataFolder  string `toml:"data_folder"`
 	UsersFolder string `toml:"users_folder"`
+	Stage3      string `toml:"stage3"`
 	// MaxRequestSize in Kio.
 	MaxRequestSize uint32           `toml:"max_request_size"`
 	Keys           Keys             `toml:"server_keys"`
@@ -86,6 +87,7 @@ const (
 	defaultMaxRequestSize uint32      = 1024
 	defaultDataFolder                 = "/var/lib/portage-builder/"
 	defaultUsersFolder                = "user"
+	defaultStage3                     = "https://distfiles.gentoo.org/releases/amd64/autobuilds/20260610T214636Z/stage3-amd64-openrc-20260610T214636Z.tar.xz"
 	defaultKeysPerms      os.FileMode = 0o600
 )
 
@@ -100,6 +102,7 @@ func LoadConfig(path string) (Config, error) {
 		DataFolder:     defaultDataFolder,
 		UsersFolder:    defaultUsersFolder,
 		MaxRequestSize: defaultMaxRequestSize,
+		Stage3:         defaultStage3,
 		Keys:           Keys{Perms: defaultKeysPerms},
 	}
 	mt, err := toml.DecodeFile(path, &cfg)
