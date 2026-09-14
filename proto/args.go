@@ -1,17 +1,14 @@
 package proto
 
 import (
-	"bytes"
+	"crypto/ecdh"
+	"crypto/x509"
 	"errors"
-	"fmt"
-	"reflect"
+	"io"
 	"regexp"
-
-	"anhgelus.world/go-cbor"
 )
 
 var (
-	ErrInvalidArg = errors.New("invalid argument")
 	ErrArgsNumber = errors.New("invalid number of arguments")
 )
 
@@ -24,65 +21,80 @@ func IsPackage(s string) bool {
 	return packageRegexp.MatchString(s)
 }
 
-func (p *Package) UnmarshalCBOR(b []byte) ([]byte, error) {
-	var s string
-	rest, err := cbor.Unmarshal(b, &s)
+type ErrArg struct {
+	Err error
+}
+
+func (e ErrArg) Error() string {
+	return e.Err.Error()
+}
+
+func (e ErrArg) Unwrap() error {
+	return e.Err
+}
+
+func (e ErrArg) ReadFrom(r io.Reader) (int64, error) {
+	var ln [1]byte
+	_, err := io.ReadFull(r, ln[:])
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	if !IsPackage(s) {
-		return nil, fmt.Errorf("%w: not a package", ErrInvalidArg)
+	rawErr := make([]byte, 0, ln[0])
+	n, err := io.ReadFull(r, rawErr)
+	n += 1
+	if err != nil {
+		return int64(n), err
 	}
-	*p = Package(s)
-	return rest, nil
+	e.Err = errors.New(string(rawErr))
+	return int64(n), nil
 }
 
-func UnmarshalArgsFor[T any](b []byte) (T, error) {
-	var arg T
-	return arg, UnmarshalArgs(b, &arg)
+func (e ErrArg) WriteTo(w io.Writer) (int64, error) {
+	err := e.Err.Error()
+	n, er := w.Write(append([]byte{byte(len(err))}, []byte(err)...))
+	return int64(n), er
 }
 
-func UnmarshalArgs(b []byte, v any) error {
-	val := reflect.ValueOf(v)
-	if val.Kind() != reflect.Pointer || val.IsNil() {
-		return fmt.Errorf("%w: expected a non nil pointer to a struct, not %T", ErrInvalidArg, v)
-	}
-	if val.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("%w: expected pointing to a struct, not %T", ErrInvalidArg, v)
-	}
-	for f, v := range val.Elem().Fields() {
-		n := reflect.New(f.Type)
-		var err error
-		b, err = cbor.Unmarshal(b, n.Interface())
-		if err != nil {
-			return err
-		}
-		v.Set(n.Elem())
-	}
-	if len(b) != 0 {
-		return fmt.Errorf("%w: requires %d", ErrArgsNumber, val.Elem().NumField())
-	}
-	return nil
+type HelloArg struct {
+	Version Version
+	Key     *ecdh.PublicKey
 }
 
-func MarshalArgs(v any) ([]byte, error) {
-	val := reflect.ValueOf(v)
-	if val.Kind() == reflect.Pointer {
-		if val.IsNil() {
-			return nil, nil
-		}
-		return MarshalArgs(val.Elem().Interface())
+func (arg *HelloArg) ReadFrom(r io.Reader) (int64, error) {
+	var version [1]byte
+	_, err := io.ReadFull(r, version[:])
+	if err != nil {
+		return 0, err
 	}
-	if val.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("%w: expected a struct, not %T", ErrInvalidArg, v)
+	arg.Version = Version(version[0])
+	var keyLength [1]byte
+	_, err = io.ReadFull(r, keyLength[:])
+	if err != nil {
+		return 1, err
 	}
-	var buf bytes.Buffer
-	for _, v := range val.Fields() {
-		b, err := cbor.Marshal(v.Interface())
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(b)
+	raw := make([]byte, 0, keyLength[0])
+	n, err := io.ReadFull(r, raw)
+	ln := 2 + int64(n)
+	if err != nil {
+		return ln, err
 	}
-	return buf.Bytes(), nil
+	rawKey, err := x509.ParsePKIXPublicKey(raw)
+	if err != nil {
+		return ln, ErrArg{err}
+	}
+	var ok bool
+	arg.Key, ok = rawKey.(*ecdh.PublicKey)
+	if !ok {
+		return ln, ErrArg{errors.New("not an ECDH public key")}
+	}
+	return ln, nil
+}
+
+func (arg *HelloArg) WriteTo(w io.Writer) (int64, error) {
+	b, err := x509.MarshalPKIXPublicKey(arg.Key)
+	if err != nil {
+		return 0, err
+	}
+	n, err := w.Write(append([]byte{byte(arg.Version), byte(len(b))}, b...))
+	return int64(n), err
 }

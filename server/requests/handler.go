@@ -3,6 +3,8 @@ package requests
 import (
 	"bytes"
 	"context"
+	"crypto/ecdh"
+	"errors"
 	"io"
 	"net"
 
@@ -11,24 +13,26 @@ import (
 
 func Handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
-	var helloBuf [1]byte
-	_, err := io.ReadFull(conn, helloBuf[:])
+	var req proto.MessageRequest[*proto.HelloArg]
+	_, err := req.ReadFrom(conn, proto.C2S)
 	if err != nil {
+		var v *proto.MessageError
+		if e, ok := errors.AsType[proto.ErrArg](err); ok {
+			v = &proto.MessageError{Kind: proto.KindBad, Arg: e}
+		} else {
+			v = proto.NewErrorResponse(err)
+		}
+		v.WriteTo(conn)
 		return
 	}
-	var keySize [1]byte
-	_, err = io.ReadFull(conn, keySize[:])
+	private, err := ecdh.P256().GenerateKey(nil)
 	if err != nil {
+		proto.NewErrorResponse(err).WriteTo(conn)
 		return
 	}
-	remote := make([]byte, 0, keySize[0])
-	_, err = io.ReadFull(conn, remote)
+	cipher, pubKey, err := proto.DeriveCipher(private, req.Arg.Key)
 	if err != nil {
-		return
-	}
-	cipher, pubKey, err := proto.ServerEDCH(proto.Version(helloBuf[0]), remote)
-	if err != nil {
-		proto.NewErrorResponse("invalid key exchange", err).Send(ctx, conn)
+		proto.NewErrorResponse(err).WriteTo(conn)
 		return
 	}
 	var buf bytes.Buffer
@@ -56,12 +60,4 @@ func Handle(ctx context.Context, conn net.Conn) {
 			return
 		}
 	}
-}
-
-func replyError(ctx context.Context, err error) error {
-	return reply(ctx, proto.NewErrorResponse("invalid request", err))
-}
-
-func reply(ctx context.Context, resp proto.Response) error {
-	return resp.Send(ctx, nil)
 }
