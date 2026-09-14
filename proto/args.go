@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"regexp"
 
-	"anhgelus.world/portage-builder/proto/cbor"
+	"anhgelus.world/go-cbor"
 )
 
 var (
