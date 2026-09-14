@@ -11,7 +11,7 @@ const (
 	loggerKey key = iota
 )
 
-func NewLoggerContext(parent context.Context, log *slog.Logger) context.Context {
+func WithLoggerContext(parent context.Context, log *slog.Logger) context.Context {
 	return context.WithValue(parent, loggerKey, log)
 }
 

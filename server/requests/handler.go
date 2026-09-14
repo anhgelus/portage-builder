@@ -5,16 +5,14 @@ import (
 
 	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/proto"
-	"golang.org/x/crypto/ssh"
 )
 
-func HandleChannel(ctx context.Context, srv *proto.Server, ch ssh.Channel, reqs <-chan *ssh.Request) {
+func HandleChannel(ctx context.Context, srv *proto.Server) {
 	log := common.ContextLogger(ctx)
-	go ssh.DiscardRequests(reqs)
 	go func() {
 		for {
 			// everything is synchrone here, because a channel is only used by one connection
-			err := srv.Handle(ctx, ch, ch)
+			err := srv.Handle(ctx, nil, nil)
 			select {
 			case <-ctx.Done():
 				return
@@ -31,10 +29,6 @@ func HandleChannel(ctx context.Context, srv *proto.Server, ch ssh.Channel, reqs 
 		}
 	}()
 	<-ctx.Done()
-	err := ch.Close()
-	if err != nil {
-		log.Error("closing", "error", err)
-	}
 	log.Info("closed", "reason", context.Cause(ctx))
 }
 
