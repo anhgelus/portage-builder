@@ -1,51 +1,62 @@
-; variables CBOR_* represent a value encoded with DAG-CBOR
+; 1. package size
+package = 2OCTET package_part "/" package_part
+package_part = 1*255(ASCII / "-")
 
-; gentoo
-	; encoded as CBOR_STRING
-package_part = 1*(ASCII / "-")
-package = package_part "/" package_part
+size = 4OCTET
+kind = kind_ok / kind_not_supported / kind_error
+flags = OCTET
 
-; commands
-    ; 1. size of the request
-    ; 2. request itself
-request = 4OCTET (hey_request / build_request / cfg_request / send_request / part_request)
-    ; init a handshake
-    ; 1. version number
-hey_request = "HEY " CBOR_UINT8 CRLF
-    ; request to build packages
-    ; 1. packages to build
-build_request = "PKGBUILD " package *(" " package) CRLF
-    ; request to remove packages from world
-    ; 1. packages to remove
-remove_request = "PKGREMOVE " package *(" " package) CRLF
-    ; request an update of every package
-update_request = "PKGUPDATE " CRLF
-    ; update the configuration
-    ; 1. number of files to send
-cfg_request = "CONFIG " CBOR_UINT8 CRLF
-    ; init sending a file
-    ; 1. absolute path
-    ; 2. number of parts
-    ; 3. raw sha3-512 checksum of the file
-send_request = "SEND " CBOR_STRING CBOR_UINT CBOR_BYTES CRLF
-    ; send a part of a file
-    ; 1. part number
-    ; 2. content size
-    ; 3. content
-part_request = "PART " CBOR_UINT CBOR_BYTES CRLF
+kind_ok = %x00
+kind_not_supported = %x01
+kind_error = %x02
+kind_bad = %x03
 
-; responses
-    ; 1. size of the response
-    ; 2. request itself
-response = 4OCTET (hoy_response / ok_response / done_response / error_response)
-    ; finish handshake
-    ; 1. version number
-    ; 2. max part size
-hoy_response = "HOY " CBOR_UINT8 CBOR_UINT CRLF
-    ; success
-ok_response = "OK " CRLF
-    ; success, can stop now (e.g., do not continue a SEND with PART)
-done_response = "DONE " CRLF
-    ; there is an error
-    ; 1. reason
-error_response = "ERROR " CBOR_STRING CRLF
+; 1. size of the description
+; 2. description
+response_error = kind_error OCTET 1*255OCTET
+response_bad = kind_bad OCTET 1*255OCTET
+
+version = %x01
+
+; 1. size of the key
+; 2. key encoded in DER
+hello_request = %x00 version OCTET 1*255OCTET
+hello_response_ok = kind_ok OCTET 1*255OCTET
+hello_response_not_supported = kind_not_supported
+
+; 1. number of parts
+; 2. file size
+; 3. sha3-256 checksum of the file
+; 4. length of filename
+; 5. filename
+upload_request = %x01 flags OCTET 4OCTET 32OCTET OCTET 1*255OCTET
+upload_response_ok = kind_ok
+upload_response_not_supported = kind_not_supported
+
+; 1. part number
+; 2. size of file content
+; 3. file content
+upload_part_request = %x02 OCTET 2OCTET 1*65536OCTET
+upload_response_ok = kind_ok
+
+; 1. number of packages to modify
+modify_package = OCTET 1*255package
+
+add_package_request = %x10 modify_package
+add_package_response_ok = kind_ok
+
+remove_package_request = %x11 modify_package
+remove_package_response_ok = kind_ok
+
+list_package_request = %x12
+; 1. number of packages
+list_package_response_ok = kind_ok 4OCTET *package
+
+build_package_request = %x13 modify_package
+build_package_response = kind_ok
+
+update_package_request = %x14 modify_package
+update_package_response = kind_ok
+
+update_world_request = %x15
+update_world_response = kind_ok

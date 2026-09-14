@@ -2,6 +2,11 @@ package proto
 
 import (
 	"context"
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/x509"
+	"errors"
+	"fmt"
 	"io"
 )
 
@@ -127,4 +132,25 @@ func NewOKResponse() Response {
 // SendDone to the client.
 func NewDoneResponse() Response {
 	return NewResponse(DoneResponse, struct{}{})
+}
+
+func ServerEDCH(ver Version, remoteRaw []byte) (cipher.Block, []byte, error) {
+	switch ver {
+	case V1:
+		remote, err := x509.ParsePKIXPublicKey(remoteRaw)
+		if err != nil {
+			return nil, nil, err
+		}
+		remoteKey, ok := remote.(*ecdh.PublicKey)
+		if !ok {
+			return nil, nil, errors.New("invalid key")
+		}
+		private, err := ecdh.P256().GenerateKey(nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		return deriveCipher(private, remoteKey)
+	default:
+		return nil, nil, fmt.Errorf("don't support version %d", ver)
+	}
 }

@@ -1,35 +1,61 @@
 package requests
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net"
 
-	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/proto"
 )
 
-func HandleChannel(ctx context.Context, srv *proto.Server) {
-	log := common.ContextLogger(ctx)
-	go func() {
-		for {
-			// everything is synchrone here, because a channel is only used by one connection
-			err := srv.Handle(ctx, nil, nil)
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			if err == nil {
-				continue
-			}
-			log.Warn("invalid request", "error", err)
-			err = replyError(ctx, err)
+func Handle(ctx context.Context, conn net.Conn) {
+	defer conn.Close()
+	var helloBuf [1]byte
+	_, err := io.ReadFull(conn, helloBuf[:])
+	if err != nil {
+		return
+	}
+	var keySize [1]byte
+	_, err = io.ReadFull(conn, keySize[:])
+	if err != nil {
+		return
+	}
+	remote := make([]byte, 0, keySize[0])
+	_, err = io.ReadFull(conn, remote)
+	if err != nil {
+		return
+	}
+	cipher, pubKey, err := proto.ServerEDCH(proto.Version(helloBuf[0]), remote)
+	if err != nil {
+		proto.NewErrorResponse("invalid key exchange", err).Send(ctx, conn)
+		return
+	}
+	var buf bytes.Buffer
+	buf.WriteByte(byte(len(pubKey)))
+	buf.Write(pubKey)
+	_, err = buf.WriteTo(conn)
+	if err != nil {
+		return
+	}
+	for {
+		ch := make(chan []byte)
+		go func() {
+			b, err := io.ReadAll(conn)
 			if err != nil {
-				log.Error("cannot reply", "error", err)
+				return
 			}
+			var un []byte
+			cipher.Decrypt(un, b)
+			ch <- un
+		}()
+		select {
+		case b := <-ch:
+			//TODO: handle
+		case <-ctx.Done():
+			return
 		}
-	}()
-	<-ctx.Done()
-	log.Info("closed", "reason", context.Cause(ctx))
+	}
 }
 
 func replyError(ctx context.Context, err error) error {

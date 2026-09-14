@@ -3,6 +3,10 @@ package proto
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/x509"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -10,7 +14,11 @@ import (
 	"unicode/utf8"
 )
 
-const Version uint8 = 1
+type Version uint8
+
+const (
+	V1 Version = iota + 1
+)
 
 // RequestCommand identifies the command sent by a client.
 type RequestCommand string
@@ -188,4 +196,20 @@ type HoyArg struct {
 
 type ErrorArg struct {
 	Error string
+}
+
+func deriveCipher(private *ecdh.PrivateKey, remote *ecdh.PublicKey) (cipher.Block, []byte, error) {
+	secret, err := private.ECDH(remote)
+	if err != nil {
+		return nil, nil, err
+	}
+	pubKey, err := x509.MarshalPKIXPublicKey(private.PublicKey())
+	if err != nil {
+		return nil, nil, err
+	}
+	block, err := aes.NewCipher(secret)
+	if err != nil {
+		return nil, nil, err
+	}
+	return block, pubKey, nil
 }
