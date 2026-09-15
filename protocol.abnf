@@ -20,8 +20,8 @@ version = %x01
 
 ; 1. size of the key
 ; 2. key encoded in DER
-hello_request = %x00 version OCTET 1*255OCTET
-hello_response_ok = kind_ok OCTET 1*255OCTET
+hello_request = %x00 version
+hello_response_ok = kind_ok
 hello_response_not_supported = kind_not_supported
 
 ; 1. number of parts

@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdh"
-	"crypto/x509"
 	"errors"
 	"io"
 )
@@ -105,18 +104,14 @@ func (msg *Message[K, T]) WriteTo(w io.Writer) (int64, error) {
 	return 1 + n, err
 }
 
-func DeriveCipher(private *ecdh.PrivateKey, remote *ecdh.PublicKey) (cipher.Block, []byte, error) {
+func DeriveCipher(private *ecdh.PrivateKey, remote *ecdh.PublicKey) (cipher.AEAD, error) {
 	secret, err := private.ECDH(remote)
 	if err != nil {
-		return nil, nil, err
-	}
-	pubKey, err := x509.MarshalPKIXPublicKey(private.PublicKey())
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	block, err := aes.NewCipher(secret)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return block, pubKey, nil
+	return cipher.NewGCMWithRandomNonce(block)
 }

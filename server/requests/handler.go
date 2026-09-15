@@ -3,8 +3,6 @@ package requests
 import (
 	"bytes"
 	"context"
-	"crypto/ecdh"
-	"errors"
 	"io"
 	"net"
 
@@ -13,49 +11,38 @@ import (
 
 func Handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
-	var req proto.MessageRequest[*proto.HelloArg]
-	_, err := req.ReadFrom(conn, proto.C2S)
-	if err != nil {
-		var v *proto.MessageError
-		if e, ok := errors.AsType[proto.ErrArg](err); ok {
-			v = &proto.MessageError{Kind: proto.KindBad, Arg: e}
-		} else {
-			v = proto.NewErrorResponse(err)
-		}
-		v.WriteTo(conn)
-		return
-	}
-	private, err := ecdh.P256().GenerateKey(nil)
-	if err != nil {
-		proto.NewErrorResponse(err).WriteTo(conn)
-		return
-	}
-	cipher, pubKey, err := proto.DeriveCipher(private, req.Arg.Key)
-	if err != nil {
-		proto.NewErrorResponse(err).WriteTo(conn)
-		return
-	}
-	var buf bytes.Buffer
-	buf.WriteByte(byte(len(pubKey)))
-	buf.Write(pubKey)
-	_, err = buf.WriteTo(conn)
-	if err != nil {
-		return
-	}
+	//TODO: read hello
 	for {
-		ch := make(chan []byte)
+		errc := make(chan error)
 		go func() {
-			b, err := io.ReadAll(conn)
+			defer close(errc)
+			var first [1]byte
+			_, err := io.ReadFull(conn, first[:])
+			if err != nil {
+				errc <- err
+				return
+			}
+			var dec []byte
+			var buf bytes.Buffer
+			buf.Write(dec)
+			switch proto.RequestKind(first[0]) {
+			case proto.KindUploadFile:
+				var arg proto.UploadFileArg
+				_, err = arg.ReadFrom(conn)
+			case proto.KindUploadFilePart:
+				var arg proto.UploadFilePartArg
+				_, err = arg.ReadFrom(conn)
+			}
+			if err != nil {
+				errc <- err
+				return
+			}
+		}()
+		select {
+		case err := <-errc:
 			if err != nil {
 				return
 			}
-			var un []byte
-			cipher.Decrypt(un, b)
-			ch <- un
-		}()
-		select {
-		case b := <-ch:
-			//TODO: handle
 		case <-ctx.Done():
 			return
 		}
