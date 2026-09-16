@@ -57,7 +57,7 @@ func NewPackage(raw string) *Package {
 	return &Package{raw}
 }
 
-func (p Package) String() string {
+func (p *Package) String() string {
 	return p.string
 }
 

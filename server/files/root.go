@@ -32,6 +32,9 @@ func CreateRoot(ctx context.Context, stage3, userFolder, user string) (*Root, er
 	p := path.Join(userFolder, user)
 	err := os.Mkdir(p, 0o755)
 	if err != nil {
+		if os.IsExist(err) {
+			return LoadRoot(userFolder, user)
+		}
 		return nil, err
 	}
 	cmd := exec.CommandContext(

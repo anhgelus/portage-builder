@@ -20,7 +20,7 @@ type Server struct {
 // New creates a [Server] server and init new users.
 func New(ctx context.Context, config *Config) (*Server, error) {
 	var srv Server
-	srv.rootManager = files.NewManager(path.Join(config.DataFolder, config.UsersFolder))
+	srv.rootManager = files.NewManager(path.Join(config.DataFolder, config.UsersFolder), config.Stage3)
 	srv.config = config
 	return nil, nil
 }
