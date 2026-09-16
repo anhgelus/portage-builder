@@ -7,19 +7,15 @@ import (
 )
 
 // ChecksumOf returns the sha3 sum of the file.
-func ChecksumOf(fs fs.FS, path string) ([64]byte, error) {
+func ChecksumOf(fs fs.FS, path string) (sum [32]byte, err error) {
 	f, err := fs.Open(path)
 	if err != nil {
-		return [64]byte{}, err
+		return
 	}
 	defer f.Close()
 	b, err := io.ReadAll(f)
 	if err != nil {
-		return [64]byte{}, err
+		return
 	}
-	return sha3.Sum512(b), nil
-}
-
-func ChecksumOfBytes(b []byte) [64]byte {
-	return sha3.Sum512(b)
+	return sha3.Sum256(b), nil
 }

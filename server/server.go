@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"log/slog"
 	"net"
 	"path"
 
@@ -56,27 +55,9 @@ func (srv *Server) Serve(ctx context.Context, l net.Listener) error {
 				conn.Close()
 				continue
 			}
-			go requests.Handle(ctx, conn.(*tls.Conn))
+			go requests.Handle(ctx, conn.(*tls.Conn), srv.rootManager)
 		}
 	}()
 	<-ctx.Done()
 	return ctx.Err()
-}
-
-func handleBuilds(log *slog.Logger, chroot *files.Root, handler *requests.UserHandler) {
-	for pkgs := range handler.PackagesAdded() {
-		err := chroot.AppendPackage(pkgs...)
-		if err != nil {
-			log.Error("appending packages", "error", err, "pkgs", pkgs)
-		}
-	}
-}
-
-func handleFiles(log *slog.Logger, chroot *files.Root, handler *requests.UserHandler) {
-	for f := range handler.UploadedFiles() {
-		err := chroot.WriteFile(f.Path, f.Content, 0o644)
-		if err != nil {
-			log.Error("writing file", "error", err, "file", f)
-		}
-	}
 }

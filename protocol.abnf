@@ -40,23 +40,20 @@ upload_part_request = %x02 OCTET 2OCTET 1*65536OCTET
 upload_response_ok = kind_ok
 
 ; 1. number of packages to modify
-modify_package = OCTET 1*255package
+list_package = OCTET 1*255package
 
-add_package_request = %x10 modify_package
+add_package_request = %x10 list_package
 add_package_response_ok = kind_ok
 
-remove_package_request = %x11 modify_package
+remove_package_request = %x11 list_package
 remove_package_response_ok = kind_ok
 
 list_package_request = %x12
 ; 1. number of packages
 list_package_response_ok = kind_ok 4OCTET *package
 
-build_package_request = %x13 modify_package
+build_package_request = %x13 list_package
 build_package_response = kind_ok
 
-update_package_request = %x14 modify_package
-update_package_response = kind_ok
-
-update_world_request = %x15
+update_world_request = %x14
 update_world_response = kind_ok

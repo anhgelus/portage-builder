@@ -1,8 +1,10 @@
 package proto
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
+	"regexp"
 )
 
 type Version uint8
@@ -31,7 +33,6 @@ const (
 	KindRemovePackage
 	KindListPackage
 	KindBuildPackage
-	KindUpdatePackage
 	KindUpdateWorld
 )
 
@@ -48,6 +49,43 @@ func (arg NothingArg) ReadFrom(io.Reader) (n int64, err error) {
 
 func (arg NothingArg) WriteTo(io.Writer) (n int64, err error) {
 	return
+}
+
+type Package struct{ string }
+
+func NewPackage(raw string) *Package {
+	return &Package{raw}
+}
+
+func (p Package) String() string {
+	return p.string
+}
+
+func (p *Package) ReadFrom(r io.Reader) (int64, error) {
+	var ln [2]byte
+	n, err := io.ReadFull(r, ln[:])
+	if err != nil {
+		return int64(n), err
+	}
+	pack := make([]byte, 0, binary.BigEndian.Uint16(ln[:]))
+	n, err = io.ReadFull(r, pack)
+	p.string = string(pack)
+	return int64(n + 2), err
+}
+
+func (p *Package) WriteTo(w io.Writer) (int64, error) {
+	buf := make([]byte, 0, 2+len(p.string))
+	buf = binary.BigEndian.AppendUint16(buf, uint16(len(p.string)))
+	buf = append(buf, []byte(p.string)...)
+	n, err := w.Write(buf)
+	return int64(n), err
+}
+
+var packageRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$`)
+
+// IsPackage indicates if the string is a valid Gentoo package.
+func IsPackage(s string) bool {
+	return packageRegexp.MatchString(s)
 }
 
 type Direction bool

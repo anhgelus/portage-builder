@@ -1,24 +1,15 @@
 package proto
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
-	"regexp"
 )
 
 var (
 	ErrArgsNumber = errors.New("invalid number of arguments")
 )
-
-type Package string
-
-var packageRegexp = regexp.MustCompile(`^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$`)
-
-// IsPackage indicates if the string is a valid Gentoo package.
-func IsPackage(s string) bool {
-	return packageRegexp.MatchString(s)
-}
 
 type HelloArg struct {
 	Version Version
@@ -105,4 +96,38 @@ func (arg *UploadFilePartArg) WriteTo(w io.Writer) (int64, error) {
 	b = append(b, arg.Content...)
 	n, err := w.Write(b)
 	return int64(n), err
+}
+
+type ListPackage struct {
+	Packages []*Package
+}
+
+func (lp *ListPackage) ReadFrom(r io.Reader) (int64, error) {
+	var ln [1]byte
+	_, err := io.ReadFull(r, ln[:])
+	if err != nil {
+		return 0, err
+	}
+	var acc int64 = 1
+	lp.Packages = make([]*Package, 0, ln[0])
+	for range ln[0] {
+		var pack Package
+		n, err := pack.ReadFrom(r)
+		acc += n
+		if err != nil {
+			return acc, err
+		}
+		lp.Packages = append(lp.Packages, &pack)
+	}
+	return acc, nil
+}
+
+func (lp *ListPackage) WriteTo(w io.Writer) (int64, error) {
+	var buf bytes.Buffer
+	buf.Grow(1 + len(lp.Packages))
+	buf.WriteByte(byte(len(lp.Packages)))
+	for _, pack := range lp.Packages {
+		pack.WriteTo(&buf)
+	}
+	return buf.WriteTo(w)
 }

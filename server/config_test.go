@@ -26,22 +26,8 @@ func TestConfig_Default(t *testing.T) {
 	if cfg.MaxRequestSize != defaultMaxRequestSize {
 		t.Error("invalid max_request_size", cfg.MaxRequestSize)
 	}
-	if cfg.Keys.Perms != defaultKeysPerms {
-		t.Error("invalid keys perms", cfg.Keys.Perms)
-	}
-	if cfg.UsersFolder != defaultUsersFolder {
-		t.Error("invalid users folder", cfg.Users)
-	}
 	if cfg.Stage3 != defaultStage3 {
 		t.Error("invalid stage3 link", cfg.Stage3)
-	}
-	for k, v := range cfg.Users {
-		if v.PublicKey != k+"_pub_key" {
-			t.Error("invalid user", k, "pub key", v.PublicKey)
-		}
-		if v.Name != k {
-			t.Error("invalid user", k, "name", v.Name)
-		}
 	}
 }
 

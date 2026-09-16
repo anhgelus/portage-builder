@@ -6,9 +6,13 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 	"sync"
 
 	"anhgelus.world/portage-builder/proto"
+	"anhgelus.world/portage-builder/server/files"
 )
 
 type Session struct {
@@ -58,4 +62,69 @@ func (s *Session) HandleFilePart(_ context.Context, arg *proto.UploadFilePartArg
 		//TODO: write file
 	}
 	return proto.OkResponse, nil
+}
+
+func (s *Session) HandleAddPackages(ctx context.Context, arg *proto.ListPackage, chroot *files.Root) (*proto.MessageResponse[proto.NothingArg], error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := chroot.AppendPackages(ctx, arg.Packages...)
+	if err != nil {
+		return nil, err
+	}
+	return proto.OkResponse, nil
+}
+
+func (s *Session) HandleRemovePackages(ctx context.Context, arg *proto.ListPackage, chroot *files.Root) (*proto.MessageResponse[proto.NothingArg], error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := chroot.RemovePackages(ctx, arg.Packages...)
+	if err != nil {
+		return nil, err
+	}
+	return proto.OkResponse, nil
+}
+
+func (s *Session) HandleBuildPackages(ctx context.Context, arg *proto.ListPackage, chroot *files.Root) (*proto.MessageResponse[proto.NothingArg], error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := chroot.BuildPackages(ctx, false, arg.Packages)
+	if err != nil {
+		return nil, err
+	}
+	return proto.OkResponse, nil
+}
+
+func (s *Session) HandleUpdateWorld(ctx context.Context, chroot *files.Root) (*proto.MessageResponse[proto.NothingArg], error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := chroot.Update(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return proto.OkResponse, nil
+}
+
+func (s *Session) HandleListPackages(ctx context.Context, chroot *files.Root) (*proto.MessageResponse[*proto.ListPackage], error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	f, err := chroot.OpenFile("etc/portage/world", os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	pkgs := strings.Split(string(b), "\n")
+	arg := &proto.ListPackage{Packages: make([]*proto.Package, 0, len(pkgs))}
+	for _, pkg := range pkgs {
+		arg.Packages = append(arg.Packages, proto.NewPackage(pkg))
+	}
+	return &proto.MessageResponse[*proto.ListPackage]{Kind: proto.KindOk, Arg: arg}, nil
 }

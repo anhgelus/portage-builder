@@ -1,5 +1,3 @@
-anhgelus.world/go-cbor v0.0.0-20260822210227-ee2e933b69b3 h1:9xVAPlQy+XRviMZO2QbeWG0kr1MFXSzCZuFKAAVI4Q8=
-anhgelus.world/go-cbor v0.0.0-20260822210227-ee2e933b69b3/go.mod h1:1HewQhUu/+rFTSJ6KV+PznTE5jlGw4P/utyg6hmUmR4=
 github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 pgregory.net/rapid v1.3.0 h1:vBvO0VSqti75J1jjYqpgPNBLKMd1+gxa9fYo7vk/Exc=

@@ -7,9 +7,10 @@ import (
 	"io"
 
 	"anhgelus.world/portage-builder/proto"
+	"anhgelus.world/portage-builder/server/files"
 )
 
-func Handle(ctx context.Context, conn *tls.Conn) {
+func Handle(ctx context.Context, conn *tls.Conn, rootManager *files.Manager) {
 	defer conn.Close()
 	var hello proto.MessageRequest[*proto.HelloArg]
 	_, err := hello.ReadFrom(conn, proto.C2S)
@@ -23,6 +24,11 @@ func Handle(ctx context.Context, conn *tls.Conn) {
 		return
 	}
 	userCert := conn.ConnectionState().PeerCertificates[0]
+	chroot, err := rootManager.GetUser(ctx, userCert.Subject.CommonName)
+	if err != nil {
+		return
+	}
+	defer chroot.Close(context.Background())
 	s := Session{user: userCert}
 	for {
 		errc := make(chan error, 1)
@@ -55,6 +61,34 @@ func Handle(ctx context.Context, conn *tls.Conn) {
 					return
 				}
 				resp, err = s.HandleFilePart(ctx, &arg)
+			case proto.KindAddPackage:
+				var arg proto.ListPackage
+				_, err = arg.ReadFrom(conn)
+				if err != nil {
+					errc <- err
+					return
+				}
+				resp, err = s.HandleAddPackages(ctx, &arg, chroot)
+			case proto.KindRemovePackage:
+				var arg proto.ListPackage
+				_, err = arg.ReadFrom(conn)
+				if err != nil {
+					errc <- err
+					return
+				}
+				resp, err = s.HandleRemovePackages(ctx, &arg, chroot)
+			case proto.KindBuildPackage:
+				var arg proto.ListPackage
+				_, err = arg.ReadFrom(conn)
+				if err != nil {
+					errc <- err
+					return
+				}
+				resp, err = s.HandleBuildPackages(ctx, &arg, chroot)
+			case proto.KindUpdateWorld:
+				resp, err = s.HandleUpdateWorld(ctx, chroot)
+			case proto.KindListPackage:
+				resp, err = s.HandleListPackages(ctx, chroot)
 			}
 			if err != nil {
 				errc <- err

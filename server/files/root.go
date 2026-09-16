@@ -1,7 +1,6 @@
 package files
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -90,23 +89,18 @@ func (r *Root) Close(ctx context.Context) error {
 	return out
 }
 
-// BuildWorld (@world set) in the [Root].
-func (r *Root) BuildWorld(ctx context.Context, emptytree bool) error {
-	return r.BuildSet(ctx, "@world", emptytree)
-}
-
-// BuildSelected (@selected set) in the [Root].
-func (r *Root) BuildSelected(ctx context.Context, emptytree bool) error {
-	return r.BuildSet(ctx, "@selected", emptytree)
-}
-
-// BuildSet in the [Root].
-func (r *Root) BuildSet(ctx context.Context, set string, emptytree bool) error {
-	flag := "-p"
+// BuildPackages in the [Root].
+func (r *Root) BuildPackages(ctx context.Context, emptytree bool, pkgs []*proto.Package) error {
+	args := make([]string, 0, 2+len(pkgs))
+	// verbose, build binpkg
+	args = append(args, "-vb")
 	if emptytree {
-		flag = "--emptytree"
+		args = append(args, "--emptytree")
 	}
-	chroot := r.CommandContext(ctx, "emerge", flag, set)
+	for _, pkg := range pkgs {
+		args = append(args, pkg.String())
+	}
+	chroot := r.CommandContext(ctx, "emerge", args...)
 	return chroot.Run()
 }
 
@@ -114,6 +108,11 @@ func (r *Root) BuildSet(ctx context.Context, set string, emptytree bool) error {
 func (r *Root) Update(ctx context.Context) error {
 	cmd := r.CommandContext(ctx, "emaint", "-a", "sync")
 	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	cmd = r.CommandContext(ctx, "emerge", "-1", "portage")
+	err = cmd.Run()
 	if err != nil {
 		return err
 	}
@@ -138,28 +137,28 @@ func (r *Root) CommandContext(ctx context.Context, name string, args ...string) 
 }
 
 // ChecksumOf a file in the [Root].
-func (r *Root) ChecksumOf(path string) ([64]byte, error) {
+func (r *Root) ChecksumOf(path string) ([32]byte, error) {
 	return common.ChecksumOf(r.FS(), path)
 }
 
-// AppendPackage to the world file (@selected set).
-func (r *Root) AppendPackage(pkgs ...*proto.Package) error {
-	f, err := r.OpenFile(
-		"etc/portage/world",
-		os.O_APPEND|os.O_WRONLY|os.O_CREATE,
-		0o644)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	defer f.Close()
-	var buf bytes.Buffer
-	buf.Grow(len(pkgs))
+// RemovePackages from the world file (@selected set).
+func (r *Root) RemovePackages(ctx context.Context, pkgs ...*proto.Package) error {
+	args := make([]string, 0, len(pkgs)+1)
+	args = append(args, "-W")
 	for _, pkg := range pkgs {
-		buf.WriteRune('\n')
-		buf.WriteString(string(*pkg))
+		args = append(args, pkg.String())
 	}
-	_, err = f.Write(buf.Bytes())
-	return err
+	return r.CommandContext(ctx, "emerge", args...).Run()
+}
+
+// AppendPackages to the world file (@selected set).
+func (r *Root) AppendPackages(ctx context.Context, pkgs ...*proto.Package) error {
+	args := make([]string, 0, len(pkgs)+1)
+	args = append(args, "-n")
+	for _, pkg := range pkgs {
+		args = append(args, pkg.String())
+	}
+	return r.CommandContext(ctx, "emerge", args...).Run()
 }
 
 func (r *Root) Info() io.Reader {
