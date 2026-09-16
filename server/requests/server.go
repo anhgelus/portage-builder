@@ -1,7 +1,9 @@
 package requests
 
 import (
+	"context"
 	"crypto/sha3"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"sync"
@@ -11,12 +13,13 @@ import (
 
 type Session struct {
 	mu          sync.Mutex
+	user        *x509.Certificate
 	fileArg     *proto.UploadFileArg
 	lastPart    *uint8
 	currentFile []byte
 }
 
-func (s *Session) HandleFile(arg *proto.UploadFileArg) (*proto.MessageResponse[proto.NothingArg], error) {
+func (s *Session) HandleFile(_ context.Context, arg *proto.UploadFileArg) (*proto.MessageResponse[proto.NothingArg], error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -29,7 +32,7 @@ func (s *Session) HandleFile(arg *proto.UploadFileArg) (*proto.MessageResponse[p
 	return proto.OkResponse, nil
 }
 
-func (s *Session) HandleFilePart(arg *proto.UploadFilePartArg) (*proto.MessageResponse[proto.NothingArg], error) {
+func (s *Session) HandleFilePart(_ context.Context, arg *proto.UploadFilePartArg) (*proto.MessageResponse[proto.NothingArg], error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

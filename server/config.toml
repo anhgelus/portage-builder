@@ -4,14 +4,10 @@ data_folder = "/var/lib/portage-builder/"
 users_folder = "users"  #  in the data_folder
 stage3 = "https://distfiles.gentoo.org/releases/amd64/autobuilds/20260610T214636Z/stage3-amd64-openrc-20260610T214636Z.tar.xz"
 
-[server_keys]
-permissions = 0o600
-public_key_file = "/etc/portage-builderd/key.pub"
-private_key_file = "/etc/portage-builderd/key"
+[keys.root]
+pem_file = "/etc/portage-builderd/keys/root.pem"
+private_key_file = "/etc/portage-builderd/keys/root.key"
 
-[users.foo]
-# name = "Foo"
-public_key = "foo_pub_key"
-
-[users.bar]
-public_key = "bar_pub_key"
+[keys.server]
+pem_file = "/etc/portage-builderd/keys/server.pem"
+private_key_file = "/etc/portage-builderd/keys/server.key"

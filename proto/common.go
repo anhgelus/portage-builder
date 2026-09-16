@@ -1,9 +1,6 @@
 package proto
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/ecdh"
 	"errors"
 	"io"
 )
@@ -102,16 +99,4 @@ func (msg *Message[K, T]) WriteTo(w io.Writer) (int64, error) {
 	}
 	n, err := msg.Arg.WriteTo(w)
 	return 1 + n, err
-}
-
-func DeriveCipher(private *ecdh.PrivateKey, remote *ecdh.PublicKey) (cipher.AEAD, error) {
-	secret, err := private.ECDH(remote)
-	if err != nil {
-		return nil, err
-	}
-	block, err := aes.NewCipher(secret)
-	if err != nil {
-		return nil, err
-	}
-	return cipher.NewGCMWithRandomNonce(block)
 }

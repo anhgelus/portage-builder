@@ -15,22 +15,28 @@ type Config struct {
 	UsersFolder string `toml:"users_folder"`
 	Stage3      string `toml:"stage3"`
 	// MaxRequestSize in Kio.
-	MaxRequestSize uint32           `toml:"max_request_size"`
-	Keys           Keys             `toml:"server_keys"`
-	Users          map[string]*User `toml:"users"`
-}
-
-// User data
-type User struct {
-	PublicKey string `toml:"public_key"`
-	Name      string `toml:"name"`
+	MaxRequestSize uint32 `toml:"max_request_size"`
+	Keys           Keys   `toml:"keys"`
 }
 
 // Keys of the server.
 type Keys struct {
-	// Perms used to store the keys.
-	Perms          os.FileMode `toml:"permissions"`
-	PrivateKeyFile string      `toml:"private_key_file"`
+	Root   Key `toml:"root"`
+	Server Key `toml:"server"`
+}
+
+type Key struct {
+	PemFile        string `toml:"cert"`
+	PrivateKeyFile string `toml:"private_key"`
+}
+
+func (k Key) Read() (cert []byte, key []byte, err error) {
+	cert, err = os.ReadFile(k.PemFile)
+	if err != nil {
+		return
+	}
+	key, err = os.ReadFile(k.PrivateKeyFile)
+	return
 }
 
 //go:embed config.toml
@@ -103,7 +109,6 @@ func LoadConfig(path string) (Config, error) {
 		UsersFolder:    defaultUsersFolder,
 		MaxRequestSize: defaultMaxRequestSize,
 		Stage3:         defaultStage3,
-		Keys:           Keys{Perms: defaultKeysPerms},
 	}
 	mt, err := toml.DecodeFile(path, &cfg)
 	if err != nil {
@@ -121,14 +126,6 @@ func LoadConfig(path string) (Config, error) {
 	for _, k := range requiredKeys {
 		if !mt.IsDefined(k...) {
 			missing = append(missing, strings.Join(k, "."))
-		}
-	}
-	for k, v := range cfg.Users {
-		if !mt.IsDefined("users", k, "public_key") {
-			missing = append(missing, "users."+k+".public_key")
-		}
-		if !mt.IsDefined("users", k, "name") {
-			v.Name = k
 		}
 	}
 	if len(missing) != 0 {

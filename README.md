@@ -12,7 +12,7 @@ It relies on a custom protocol to be as fast as possible.
 It uses DAG-CBOR to encode and decode arguments to reduce the network overhead.
 
 The official implementation is using SSH to send information between the server and the client.
-Clients can authentificate with public keys.
+Clients can authenticate with public keys.
 You can reimplement the protocol with HTTP, Gemini, Gopher or any other layer-7 application.
 
 ## Usage

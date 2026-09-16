@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"log/slog"
 	"net"
 	"path"
@@ -10,20 +13,42 @@ import (
 	"anhgelus.world/portage-builder/server/requests"
 )
 
-type SSH struct {
-	serverConfig *Config
-	rootManager  *files.Manager
+type Server struct {
+	config      *Config
+	rootManager *files.Manager
 }
 
-// New creates a [SSH] server and init new users.
-func New(ctx context.Context, config *Config) (*SSH, error) {
-	var ssh SSH
-	ssh.rootManager = files.NewManager(path.Join(config.DataFolder, config.UsersFolder))
-	ssh.serverConfig = config
+// New creates a [Server] server and init new users.
+func New(ctx context.Context, config *Config) (*Server, error) {
+	var srv Server
+	srv.rootManager = files.NewManager(path.Join(config.DataFolder, config.UsersFolder))
+	srv.config = config
 	return nil, nil
 }
 
-func (ssh *SSH) Serve(ctx context.Context, l net.Listener) error {
+func (srv *Server) Serve(ctx context.Context, l net.Listener) error {
+	cfg := srv.config
+	rootCert, _, err := cfg.Keys.Root.Read()
+	if err != nil {
+		return err
+	}
+	serverCert, key, err := cfg.Keys.Server.Read()
+	if err != nil {
+		return err
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(rootCert) {
+		return errors.New("invalid root certificate")
+	}
+	cert, err := tls.X509KeyPair(serverCert, key)
+	if err != nil {
+		return err
+	}
+	l = tls.NewListener(l, &tls.Config{
+		ClientCAs:    pool,
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	})
 	go func() {
 		for {
 			conn, err := l.Accept()
@@ -31,7 +56,7 @@ func (ssh *SSH) Serve(ctx context.Context, l net.Listener) error {
 				conn.Close()
 				continue
 			}
-			go requests.Handle(ctx, conn)
+			go requests.Handle(ctx, conn.(*tls.Conn))
 		}
 	}()
 	<-ctx.Done()
