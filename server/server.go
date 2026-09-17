@@ -8,6 +8,7 @@ import (
 	"net"
 	"path"
 
+	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/server/files"
 	"anhgelus.world/portage-builder/server/requests"
 )
@@ -49,13 +50,16 @@ func (srv *Server) Serve(ctx context.Context, l net.Listener) error {
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	})
 	go func() {
+		lg := common.ContextLogger(ctx)
 		for {
 			conn, err := l.Accept()
 			if err != nil {
 				conn.Close()
 				continue
 			}
-			go requests.Handle(ctx, conn.(*tls.Conn), srv.rootManager)
+			lg := lg.With("ip", conn.RemoteAddr())
+			lg.Debug("handling new request")
+			go requests.Handle(common.WithLogger(ctx, lg), conn.(*tls.Conn), srv.rootManager)
 		}
 	}()
 	<-ctx.Done()

@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/server"
 )
 
@@ -27,11 +29,13 @@ func main() {
 		panic(err)
 	}
 	args := flag.Args()
+	lg := slog.Default()
 	if len(args) < 1 {
 		ctx, stop := signal.NotifyContext(
 			context.Background(),
 			os.Kill, os.Interrupt, syscall.SIGTERM)
 		defer stop()
+		ctx = common.WithLogger(ctx, lg)
 		srv, err := server.New(ctx, &cfg)
 		if err != nil {
 			panic(err)
@@ -40,11 +44,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		println("started")
+		lg.Info("started")
 		err = srv.Serve(ctx, l)
 		select {
 		case <-ctx.Done():
-			println("exiting")
+			lg.Info("exiting")
 			return
 		default:
 			panic(err)

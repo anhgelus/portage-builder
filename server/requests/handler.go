@@ -4,17 +4,21 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 
+	"anhgelus.world/portage-builder/common"
 	"anhgelus.world/portage-builder/proto"
 	"anhgelus.world/portage-builder/server/files"
 )
 
 func Handle(ctx context.Context, conn *tls.Conn, rootManager *files.Manager) {
 	defer conn.Close()
+	lg := common.ContextLogger(ctx)
 	var hello proto.MessageRequest[*proto.HelloArg]
 	_, err := hello.ReadFrom(conn, proto.C2S)
 	if err != nil {
+		lg.Debug("invalid hello", "error", err)
 		return
 	}
 	switch hello.Arg.Version {
@@ -24,8 +28,12 @@ func Handle(ctx context.Context, conn *tls.Conn, rootManager *files.Manager) {
 		return
 	}
 	userCert := conn.ConnectionState().PeerCertificates[0]
+	lg = lg.With("user", userCert.Subject.CommonName)
+	ctx = common.WithLogger(ctx, lg)
 	chroot, err := rootManager.GetUser(ctx, userCert.Subject.CommonName)
 	if err != nil {
+		lg.Error("cannot get chroot", "error", err)
+		proto.NewErrorResponse(errors.New("internal error")).WriteTo(conn)
 		return
 	}
 	defer chroot.Close(context.Background())
@@ -102,6 +110,7 @@ func Handle(ctx context.Context, conn *tls.Conn, rootManager *files.Manager) {
 		select {
 		case err := <-errc:
 			if err != nil {
+				lg.Error("handling request", "error", err)
 				return
 			}
 		case <-ctx.Done():

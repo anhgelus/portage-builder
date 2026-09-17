@@ -29,11 +29,14 @@ func LoadRoot(userFolder, user string) (*Root, error) {
 //
 // stage3 is the path to the xz-compressed tarball containing the Gentoo stage3 to use.
 func CreateRoot(ctx context.Context, stage3, userFolder, user string) (*Root, error) {
+	lg := common.ContextLogger(ctx)
 	p := path.Join(userFolder, user)
 	_, err := os.Stat(p)
 	if err == nil {
+		lg.Debug("loading root")
 		return LoadRoot(userFolder, user)
 	}
+	lg.Info("creating root")
 	err = os.MkdirAll(userFolder, 0o755)
 	if err != nil {
 		return nil, err
@@ -46,11 +49,13 @@ func CreateRoot(ctx context.Context, stage3, userFolder, user string) (*Root, er
 	if err != nil {
 		return nil, err
 	}
+	lg.Info("loading root")
 	return LoadRoot(userFolder, user)
 }
 
 // Mount required folders in the [Root].
 func (r *Root) Mount(ctx context.Context) error {
+	common.ContextLogger(ctx).Debug("mounting root")
 	mnt := exec.CommandContext(ctx, "mount", "--types", "proc", "/proc", r.Path("proc"))
 	err := mnt.Run()
 	if err != nil {
@@ -71,6 +76,7 @@ func (r *Root) Path(inside string) (absolute string) {
 }
 
 func (r *Root) Close(ctx context.Context) error {
+	common.ContextLogger(ctx).Debug("closing root")
 	errs := make([]error, 0, 4)
 	mnt := exec.CommandContext(ctx, "umount", r.Path("proc"))
 	errs = append(errs, mnt.Run())
@@ -95,6 +101,7 @@ func (r *Root) Close(ctx context.Context) error {
 
 // BuildPackages in the [Root].
 func (r *Root) BuildPackages(ctx context.Context, emptytree bool, pkgs []*proto.Package) error {
+	common.ContextLogger(ctx).Debug("building", "packages", pkgs, "emptytree", emptytree)
 	args := make([]string, 0, 2+len(pkgs))
 	// verbose, build binpkg
 	args = append(args, "-vb")
@@ -110,21 +117,27 @@ func (r *Root) BuildPackages(ctx context.Context, emptytree bool, pkgs []*proto.
 
 // Update the [Root] by upgrading the @world.
 func (r *Root) Update(ctx context.Context) error {
+	lg := common.ContextLogger(ctx)
+	lg.Info("update @world")
+	lg.Debug("syncing")
 	cmd := r.CommandContext(ctx, "emaint", "-a", "sync")
 	err := cmd.Run()
 	if err != nil {
 		return err
 	}
+	lg.Debug("upgrading portage")
 	cmd = r.CommandContext(ctx, "emerge", "-1", "portage")
 	err = cmd.Run()
 	if err != nil {
 		return err
 	}
+	lg.Debug("upgrading @world")
 	cmd = r.CommandContext(ctx, "emerge", "-vuDN", "@world")
 	err = cmd.Run()
 	if err != nil {
 		return err
 	}
+	lg.Debug("cleaning @world")
 	cmd = r.CommandContext(ctx, "emerge", "--depclean")
 	return cmd.Run()
 }
@@ -147,6 +160,7 @@ func (r *Root) ChecksumOf(path string) ([32]byte, error) {
 
 // RemovePackages from the world file (@selected set).
 func (r *Root) RemovePackages(ctx context.Context, pkgs ...*proto.Package) error {
+	common.ContextLogger(ctx).Debug("removing", "pkgs", pkgs)
 	args := make([]string, 0, len(pkgs)+1)
 	args = append(args, "-W")
 	for _, pkg := range pkgs {
@@ -157,6 +171,7 @@ func (r *Root) RemovePackages(ctx context.Context, pkgs ...*proto.Package) error
 
 // AppendPackages to the world file (@selected set).
 func (r *Root) AppendPackages(ctx context.Context, pkgs ...*proto.Package) error {
+	common.ContextLogger(ctx).Debug("appending", "pkgs", pkgs)
 	args := make([]string, 0, len(pkgs)+1)
 	args = append(args, "-n")
 	for _, pkg := range pkgs {
