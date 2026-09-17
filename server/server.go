@@ -59,7 +59,10 @@ func (srv *Server) Serve(ctx context.Context, l net.Listener) error {
 			}
 			lg := lg.With("ip", conn.RemoteAddr())
 			lg.Debug("handling new request")
-			go requests.Handle(common.WithLogger(ctx, lg), conn.(*tls.Conn), srv.rootManager)
+			go requests.Handle(
+				common.WithLogger(ctx, lg),
+				conn.(*tls.Conn),
+				srv.rootManager)
 		}
 	}()
 	<-ctx.Done()

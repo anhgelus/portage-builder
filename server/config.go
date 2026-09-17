@@ -2,6 +2,7 @@ package server
 
 import (
 	_ "embed"
+	"errors"
 	"os"
 	"strings"
 
@@ -37,6 +38,38 @@ func (k Key) Read() (cert []byte, key []byte, err error) {
 	}
 	key, err = os.ReadFile(k.PrivateKeyFile)
 	return
+}
+
+func (k Key) VerifyPermissions() error {
+	info, err := os.Stat(k.PemFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		if info.Mode().Perm() != 0o600 {
+			return &os.PathError{
+				Op:   "checking permission",
+				Err:  errors.New("insecured permission"),
+				Path: k.PemFile,
+			}
+		}
+	}
+	info, err = os.Stat(k.PrivateKeyFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		if info.Mode().Perm() != 0o600 {
+			return &os.PathError{
+				Op:   "checking permission",
+				Err:  errors.New("insecured permission"),
+				Path: k.PrivateKeyFile,
+			}
+		}
+	}
+	return nil
 }
 
 //go:embed config.toml
@@ -132,5 +165,13 @@ func LoadConfig(path string) (Config, error) {
 		return cfg, ErrInvalidConfig{missing}
 	}
 	cfg.MaxRequestSize *= 1024
+	err = cfg.Keys.Root.VerifyPermissions()
+	if err != nil {
+		return cfg, err
+	}
+	err = cfg.Keys.Server.VerifyPermissions()
+	if err != nil {
+		return cfg, err
+	}
 	return cfg, nil
 }
