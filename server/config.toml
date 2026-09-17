@@ -5,9 +5,9 @@ users_folder = "users"  #  in the data_folder
 stage3 = "https://distfiles.gentoo.org/releases/amd64/autobuilds/20260610T214636Z/stage3-amd64-openrc-20260610T214636Z.tar.xz"
 
 [keys.root]
-pem_file = "/etc/portage-builderd/keys/root.pem"
-private_key_file = "/etc/portage-builderd/keys/root.key"
+cert = "/etc/portage-builderd/keys/root.pem"
+private_key = "/etc/portage-builderd/keys/root.key"
 
 [keys.server]
-pem_file = "/etc/portage-builderd/keys/server.pem"
-private_key_file = "/etc/portage-builderd/keys/server.key"
+cert = "/etc/portage-builderd/keys/server.pem"
+private_key = "/etc/portage-builderd/keys/server.key"

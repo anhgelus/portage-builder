@@ -85,7 +85,7 @@ func (e ErrInvalidConfig) Is(err error) bool {
 	}
 }
 
-var requiredKeys = [][]string{{"server_keys", "private_key_file"}}
+var requiredKeys = [][]string{{"keys", "root"}, {"keys", "server"}}
 
 // Default configs
 const (
