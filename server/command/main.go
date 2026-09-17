@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"anhgelus.world/portage-builder/server"
 )
@@ -23,8 +28,27 @@ func main() {
 	}
 	args := flag.Args()
 	if len(args) < 1 {
-		//TODO: launch
-		return
+		ctx, stop := signal.NotifyContext(
+			context.Background(),
+			os.Kill, os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		srv, err := server.New(ctx, &cfg)
+		if err != nil {
+			panic(err)
+		}
+		l, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Port))
+		if err != nil {
+			panic(err)
+		}
+		println("started")
+		err = srv.Serve(ctx, l)
+		select {
+		case <-ctx.Done():
+			println("exiting")
+			return
+		default:
+			panic(err)
+		}
 	}
 	switch args[0] {
 	case "gen-keys":

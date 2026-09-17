@@ -30,11 +30,12 @@ func LoadRoot(userFolder, user string) (*Root, error) {
 // stage3 is the path to the xz-compressed tarball containing the Gentoo stage3 to use.
 func CreateRoot(ctx context.Context, stage3, userFolder, user string) (*Root, error) {
 	p := path.Join(userFolder, user)
-	err := os.Mkdir(p, 0o755)
+	_, err := os.Stat(p)
+	if err == nil {
+		return LoadRoot(userFolder, user)
+	}
+	err = os.MkdirAll(userFolder, 0o755)
 	if err != nil {
-		if os.IsExist(err) {
-			return LoadRoot(userFolder, user)
-		}
 		return nil, err
 	}
 	cmd := exec.CommandContext(

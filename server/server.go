@@ -22,7 +22,7 @@ func New(ctx context.Context, config *Config) (*Server, error) {
 	var srv Server
 	srv.rootManager = files.NewManager(path.Join(config.DataFolder, config.UsersFolder), config.Stage3)
 	srv.config = config
-	return nil, nil
+	return &srv, nil
 }
 
 func (srv *Server) Serve(ctx context.Context, l net.Listener) error {
